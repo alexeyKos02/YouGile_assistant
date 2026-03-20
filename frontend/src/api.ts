@@ -1,7 +1,9 @@
 import type { GeneratedTask, CreateResult } from './types';
 
+const BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
