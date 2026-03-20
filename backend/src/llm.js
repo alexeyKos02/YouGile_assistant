@@ -1,0 +1,51 @@
+import OpenAI from 'openai';
+
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const SYSTEM_PROMPT = `Ты — опытный продакт-менеджер и аналитик. Твоя задача — по краткому описанию задачи от разработчика генерировать структурированную задачу для таск-трекера.
+
+Правила:
+- Заголовок: короткий, понятный, на русском, начинается с глагола или существительного
+- Описание: 2–4 предложения, поясняет контекст и цель задачи
+- Чеклист: 3–6 конкретных пунктов (если задача не тривиальная)
+- Приоритет: low / medium / high / critical
+- Тип: bug / feature / integration / task / improvement
+- Дедлайн: YYYY-MM-DD
+
+Отвечай ТОЛЬКО валидным JSON без markdown-блоков, строго в формате:
+{
+  "title": "...",
+  "description": "...",
+  "checklist": ["...", "..."],
+  "priority": "...",
+  "type": "...",
+  "deadline": "..."
+}`;
+
+export async function generateTask(rawText, hints) {
+  const userPrompt = `
+Краткое описание задачи: "${rawText}"
+
+Подсказки (уже определено правилами, учти при генерации):
+- Приоритет: ${hints.priority}
+- Тип задачи: ${hints.type ?? 'определи сам'}
+- Проект: ${hints.project ?? 'не определён'}
+- Дедлайн через дней: ${hints.deadlineDays} (дата: ${hints.deadline})
+
+Сгенерируй задачу в формате JSON.
+`.trim();
+
+  const response = await client.chat.completions.create({
+    model: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.4,
+    max_tokens: 800,
+    response_format: { type: 'json_object' },
+  });
+
+  const content = response.choices[0].message.content;
+  return JSON.parse(content);
+}
