@@ -10,9 +10,29 @@ export interface GeneratedTask {
   deadline: string;
   project: string | null;
   labels: string[];
+  columnId?: string;
+  assigneeId?: string;
 }
 
 export interface CreateResult {
   id: string;
   [key: string]: unknown;
+}
+
+export interface YouGileProject {
+  id: string;
+  title: string;
+}
+
+export interface YouGileColumn {
+  id: string;
+  name: string;
+}
+
+export interface YouGileUser {
+  id: string;
+  email: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
 }

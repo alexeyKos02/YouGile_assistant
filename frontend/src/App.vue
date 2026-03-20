@@ -31,6 +31,52 @@
         </button>
       </section>
 
+      <!-- YouGile settings -->
+      <section class="yougile-settings">
+        <div class="settings-row">
+          <!-- Project -->
+          <div class="settings-field">
+            <label class="field-label">Проект</label>
+            <select
+              class="select-input"
+              v-model="selectedProjectId"
+              @change="onProjectChange"
+              :disabled="loadingProjects"
+            >
+              <option value="">{{ loadingProjects ? 'Загрузка...' : '— выберите проект —' }}</option>
+              <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.title }}</option>
+            </select>
+          </div>
+
+          <!-- Column -->
+          <div class="settings-field">
+            <label class="field-label">Колонка</label>
+            <select
+              class="select-input"
+              v-model="selectedColumnId"
+              :disabled="!selectedProjectId || loadingColumns"
+            >
+              <option value="">{{ loadingColumns ? 'Загрузка...' : '— выберите колонку —' }}</option>
+              <option v-for="c in columns" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+
+          <!-- Assignee -->
+          <div class="settings-field">
+            <label class="field-label">Исполнитель</label>
+            <select
+              class="select-input"
+              v-model="selectedAssigneeId"
+              :disabled="loadingUsers"
+            >
+              <option value="">{{ loadingUsers ? 'Загрузка...' : '— без исполнителя —' }}</option>
+              <option v-for="u in users" :key="u.id" :value="u.id">{{ userLabel(u) }}</option>
+            </select>
+          </div>
+        </div>
+        <div v-if="settingsError" class="settings-error">⚠️ {{ settingsError }}</div>
+      </section>
+
       <!-- Error -->
       <div v-if="error" class="error-banner">
         {{ error }}
@@ -99,7 +145,8 @@
               <button
                 class="btn btn-primary"
                 @click="handleCreate"
-                :disabled="creating"
+                :disabled="creating || !selectedColumnId"
+                :title="!selectedColumnId ? 'Выберите проект и колонку' : ''"
               >
                 <span v-if="creating" class="spinner" />
                 {{ creating ? 'Создаю...' : '✓ Создать задачу в YouGile' }}
@@ -126,9 +173,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import type { GeneratedTask } from './types';
-import { generateTask, createTask } from './api';
+import { ref, onMounted } from 'vue';
+import type { GeneratedTask, YouGileProject, YouGileColumn, YouGileUser } from './types';
+import { generateTask, createTask, getProjects, getColumns, getUsers } from './api';
 
 const inputText = ref('');
 const task = ref<GeneratedTask | null>(null);
@@ -137,6 +184,60 @@ const creating = ref(false);
 const error = ref('');
 const copied = ref(false);
 const createSuccess = ref('');
+
+// YouGile selectors
+const projects = ref<YouGileProject[]>([]);
+const columns = ref<YouGileColumn[]>([]);
+const users = ref<YouGileUser[]>([]);
+const selectedProjectId = ref('');
+const selectedColumnId = ref('');
+const selectedAssigneeId = ref('');
+const loadingProjects = ref(false);
+const loadingColumns = ref(false);
+const loadingUsers = ref(false);
+const settingsError = ref('');
+
+onMounted(async () => {
+  await Promise.all([loadProjects(), loadUsers()]);
+});
+
+async function loadProjects() {
+  loadingProjects.value = true;
+  settingsError.value = '';
+  try {
+    projects.value = await getProjects();
+  } catch (e) {
+    settingsError.value = 'Не удалось загрузить проекты. Проверьте YOUGILE_API_KEY.';
+  } finally {
+    loadingProjects.value = false;
+  }
+}
+
+async function loadUsers() {
+  loadingUsers.value = true;
+  try {
+    users.value = await getUsers();
+  } catch {
+    // silently fail — users are optional
+  } finally {
+    loadingUsers.value = false;
+  }
+}
+
+async function onProjectChange() {
+  selectedColumnId.value = '';
+  columns.value = [];
+  if (!selectedProjectId.value) return;
+
+  loadingColumns.value = true;
+  try {
+    columns.value = await getColumns(selectedProjectId.value);
+  } catch (e) {
+    settingsError.value = 'Не удалось загрузить колонки проекта.';
+  } finally {
+    loadingColumns.value = false;
+  }
+}
 
 async function handleGenerate() {
   if (!inputText.value.trim() || loading.value) return;
@@ -158,7 +259,12 @@ async function handleCreate() {
   creating.value = true;
   error.value = '';
   try {
-    const result = await createTask(task.value);
+    const taskToCreate = {
+      ...task.value,
+      columnId: selectedColumnId.value || undefined,
+      assigneeId: selectedAssigneeId.value || undefined,
+    };
+    const result = await createTask(taskToCreate);
     createSuccess.value = result.id ?? 'создана';
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Ошибка создания задачи';
@@ -216,5 +322,11 @@ function typeLabel(t: string) {
     improvement: '🔧 Доработка',
   };
   return map[t] ?? t;
+}
+
+function userLabel(u: YouGileUser): string {
+  if (u.name) return u.name;
+  if (u.firstName || u.lastName) return `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim();
+  return u.email;
 }
 </script>

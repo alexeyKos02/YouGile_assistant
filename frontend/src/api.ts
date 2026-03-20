@@ -1,4 +1,4 @@
-import type { GeneratedTask, CreateResult } from './types';
+import type { GeneratedTask, CreateResult, YouGileProject, YouGileColumn, YouGileUser } from './types';
 
 const BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -13,10 +13,32 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T;
 }
 
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(path);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data as T;
+}
+
 export function generateTask(text: string): Promise<GeneratedTask> {
   return post<GeneratedTask>('/api/generate', { text });
 }
 
 export function createTask(task: GeneratedTask): Promise<CreateResult> {
   return post<CreateResult>('/api/create', task);
+}
+
+export async function getProjects(): Promise<YouGileProject[]> {
+  const data = await get<{ content?: YouGileProject[] } | YouGileProject[]>('/api/projects');
+  return Array.isArray(data) ? data : (data.content ?? []);
+}
+
+export async function getColumns(projectId: string): Promise<YouGileColumn[]> {
+  const data = await get<{ content?: YouGileColumn[] } | YouGileColumn[]>(`/api/columns/${projectId}`);
+  return Array.isArray(data) ? data : (data.content ?? []);
+}
+
+export async function getUsers(): Promise<YouGileUser[]> {
+  const data = await get<{ content?: YouGileUser[] } | YouGileUser[]>('/api/users');
+  return Array.isArray(data) ? data : (data.content ?? []);
 }

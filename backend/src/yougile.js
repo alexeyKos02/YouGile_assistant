@@ -24,12 +24,18 @@ export async function getColumns() {
   return request('GET', `/projects/${projectId}/sprints`);
 }
 
-export async function createTask({ title, description, checklist, priority, deadline, columnId }) {
+export async function getColumnsForProject(projectId) {
+  if (!projectId) throw new Error('projectId is required');
+  return request('GET', `/projects/${projectId}/sprints`);
+}
+
+export async function getUsers() {
+  return request('GET', '/employees');
+}
+
+export async function createTask({ title, description, checklist, priority, deadline, columnId, assigneeId }) {
   const columnIdToUse = columnId ?? process.env.YOUGILE_COLUMN_ID;
   if (!columnIdToUse) throw new Error('YOUGILE_COLUMN_ID not set and not provided');
-
-  // Map priority string to YouGile format
-  const priorityMap = { low: 0, medium: 1, high: 2, critical: 3 };
 
   const body = {
     title,
@@ -39,6 +45,10 @@ export async function createTask({ title, description, checklist, priority, dead
 
   if (deadline) {
     body.deadline = { deadline: new Date(deadline).getTime() };
+  }
+
+  if (assigneeId) {
+    body.assigned = { [assigneeId]: true };
   }
 
   return request('POST', '/tasks', body);

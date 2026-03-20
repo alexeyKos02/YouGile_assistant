@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { applyRules, computeDeadline } from './rules.js';
 import { generateTask } from './llm.js';
-import { createTask } from './yougile.js';
+import { createTask, getProjects, getColumnsForProject, getUsers } from './yougile.js';
 
 const app = express();
 app.use(cors());
@@ -42,19 +42,52 @@ app.post('/api/generate', async (req, res) => {
 });
 
 // POST /api/create
-// Body: { title, description, checklist, priority, deadline, columnId? }
+// Body: { title, description, checklist, priority, deadline, columnId?, assigneeId? }
 // Returns: { id, url }
 app.post('/api/create', async (req, res) => {
-  const { title, description, checklist, priority, deadline, columnId } = req.body;
+  const { title, description, checklist, priority, deadline, columnId, assigneeId } = req.body;
   if (!title) {
     return res.status(400).json({ error: 'title is required' });
   }
 
   try {
-    const result = await createTask({ title, description, checklist, priority, deadline, columnId });
+    const result = await createTask({ title, description, checklist, priority, deadline, columnId, assigneeId });
     res.json(result);
   } catch (err) {
     console.error('Create error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/projects
+app.get('/api/projects', async (_req, res) => {
+  try {
+    const result = await getProjects();
+    res.json(result);
+  } catch (err) {
+    console.error('Projects error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/columns/:projectId
+app.get('/api/columns/:projectId', async (req, res) => {
+  try {
+    const result = await getColumnsForProject(req.params.projectId);
+    res.json(result);
+  } catch (err) {
+    console.error('Columns error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/users
+app.get('/api/users', async (_req, res) => {
+  try {
+    const result = await getUsers();
+    res.json(result);
+  } catch (err) {
+    console.error('Users error:', err);
     res.status(500).json({ error: err.message });
   }
 });

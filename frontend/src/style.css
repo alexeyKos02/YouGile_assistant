@@ -320,6 +320,60 @@ body { margin: 0; min-height: 100svh; }
   padding-top: 4px;
 }
 
+/* YouGile settings */
+.yougile-settings {
+  margin-top: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .settings-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.select-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--text-h);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b88' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.select-input:focus { border-color: var(--accent); }
+.select-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.settings-error {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--warning);
+}
+
 /* Transition */
 .slide-up-enter-active {
   transition: opacity 0.3s ease, transform 0.3s ease;
