@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: yougile-ai-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node src/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: YOUGILE_API_KEY
+        sync: false
+      - key: YOUGILE_PROJECT_ID
+        sync: false
+      - key: YOUGILE_COLUMN_ID
+        sync: false
+      - key: PORT
+        value: 10000
