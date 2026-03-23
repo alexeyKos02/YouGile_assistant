@@ -102,10 +102,19 @@
           <div class="result-card">
             <!-- Badges -->
             <div class="badges">
-              <span class="badge" :class="`badge-priority-${task.priority}`">
-                {{ priorityLabel(task.priority) }}
-              </span>
-              <span class="badge badge-type">{{ typeLabel(task.type) }}</span>
+              <select class="badge-select" :class="`badge-priority-${task.priority}`" v-model="task.priority">
+                <option value="low">↓ Низкий</option>
+                <option value="medium">→ Средний</option>
+                <option value="high">↑ Высокий</option>
+                <option value="critical">🔥 Критический</option>
+              </select>
+              <select class="badge-select badge-type-select" v-model="task.type">
+                <option value="task">📋 Задача</option>
+                <option value="bug">🐛 Баг</option>
+                <option value="feature">✨ Фича</option>
+                <option value="integration">🔌 Интеграция</option>
+                <option value="improvement">🔧 Доработка</option>
+              </select>
               <span v-if="task.project" class="badge badge-project">{{ task.project }}</span>
               <span v-for="label in task.labels" :key="label" class="badge badge-label">{{ label }}</span>
             </div>
