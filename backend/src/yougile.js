@@ -42,7 +42,7 @@ export async function getTaskById(taskId) {
 
 export async function getTaskMessages(taskId) {
   try {
-    const data = await request('GET', `/chats/${taskId}/messages?limit=15`);
+    const data = await request('GET', `/chats/${taskId}/messages?limit=8`);
     return (data.content ?? [])
       .filter(m => m.text && m.text.trim().length > 2)
       .map(m => ({ text: m.text.trim(), createdAt: m.timestamp ?? null }));

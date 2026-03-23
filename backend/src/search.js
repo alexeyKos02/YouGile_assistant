@@ -87,69 +87,49 @@ export async function searchTasks(query, tasks, totalTasksInProject = 0, model =
   }
 
   const tasksText = tasks.map(t => {
-    // Checklists with each item
+    // Checklists — cap items at 15, title at 60 chars
     const checklistText = (t.checklists ?? []).map(cl => {
       const done  = cl.items?.filter(i => i.isCompleted).length ?? 0;
       const total = cl.items?.length ?? 0;
       const items = (cl.items ?? [])
-        .map(i => `      ${i.isCompleted ? '[✓]' : '[ ]'} "${i.title}"`)
+        .slice(0, 15)
+        .map(i => `  ${i.isCompleted ? '[✓]' : '[ ]'} ${i.title.slice(0, 60)}`)
         .join('\n');
-      return `  Чеклист "${cl.title}" — ${done}/${total} выполнено:\n${items}`;
-    }).join('\n') || '  нет чеклистов';
+      return `Чеклист "${cl.title}" ${done}/${total}:\n${items}`;
+    }).join('\n') || 'нет чеклистов';
 
-    // Subtasks with details
+    // Subtasks — no description, just title+status
     const subtaskText = (t.subtaskDetails ?? []).map(s => {
-      const clParts = (s.checklists ?? []).map(cl => `чеклист ${cl.done}/${cl.total}`).join(', ');
-      const desc = s.description ? `\n      "${s.description.slice(0, 120)}"` : '';
-      return `  ${s.completed ? '[✓]' : '[ ]'} "${s.title}"${clParts ? ` (${clParts})` : ''}${desc}`;
-    }).join('\n') || '  нет подзадач';
+      const clParts = (s.checklists ?? []).map(cl => `${cl.done}/${cl.total}`).join(', ');
+      return `${s.completed ? '[✓]' : '[ ]'} ${s.title}${clParts ? ` (${clParts})` : ''}`;
+    }).join('\n') || 'нет подзадач';
 
-    // Chat messages
+    // Chat — max 5 messages, 80 chars each
     const chatText = (t.chatMessages ?? []).length > 0
       ? (t.chatMessages ?? [])
-          .slice(0, 10)
-          .map(m => `  > "${m.text.slice(0, 150)}"`)
+          .slice(0, 5)
+          .map(m => `> ${m.text.slice(0, 80)}`)
           .join('\n')
-      : '  (чат пустой — сообщений нет)';
+      : '(чат пустой)';
 
-    // Siblings
-    const siblingsText = (t.siblings ?? []).length > 0
-      ? (t.siblings ?? []).map(s => `  ${s.completed ? '[✓]' : '[ ]'} "${s.title}"`).join('\n')
-      : null;
-
-    // Cross-links
+    // Cross-links — max 5
     const crossText = (t.crossLinks ?? []).length > 0
-      ? (t.crossLinks ?? []).map(c => `  • "${c.title}" [${c.columnTitle ?? '?'}] ${c.completed ? '✓' : '○'}`).join('\n')
+      ? (t.crossLinks ?? []).slice(0, 5).map(c => `• ${c.title} [${c.columnTitle ?? '?'}] ${c.completed ? '✓' : '○'}`).join('\n')
       : null;
 
     const deadlineStr = t.deadline?.deadline
-      ? `Дедлайн: ${new Date(t.deadline.deadline).toLocaleDateString('ru-RU')}`
-      : 'Дедлайн: не указан';
+      ? new Date(t.deadline.deadline).toLocaleDateString('ru-RU')
+      : 'нет';
 
     return [
-      `╔══════════════════════════════════════`,
-      `║ ЗАДАЧА: "${t.title}"`,
-      `║ ID: ${t.id}`,
-      `║ Колонка: "${t.columnTitle ?? '?'}" | Завершена: ${t.completed ? 'ДА ✓' : 'НЕТ'} | ${deadlineStr}`,
-      `╚══════════════════════════════════════`,
-      ``,
-      `ОПИСАНИЕ:`,
-      t.description ? t.description.slice(0, 500) : '(описание не заполнено)',
-      ``,
-      `ЧЕКЛИСТЫ:`,
-      checklistText,
-      ``,
-      `ПОДЗАДАЧИ (${t.subtaskDetails?.length ?? 0}):`,
-      subtaskText,
-      ``,
-      `ЧАТ (${t.chatMessages?.length ?? 0} сообщений):`,
-      chatText,
-      ``,
-      t.parentTask
-        ? `РОДИТЕЛЬ: "${t.parentTask.title}" (${t.parentTask.completed ? 'завершена ✓' : 'в работе'})`
-        : `РОДИТЕЛЬ: нет (самостоятельная задача)`,
-      siblingsText ? `БРАТСКИЕ ПОДЗАДАЧИ:\n${siblingsText}` : null,
-      crossText ? `СВЯЗАННЫЕ ЗАДАЧИ ПО ТЕМЕ:\n${crossText}` : null,
+      `--- ЗАДАЧА: ${t.title}`,
+      `ID:${t.id} | Колонка:${t.columnTitle ?? '?'} | ${t.completed ? 'ЗАВЕРШЕНА' : 'НЕ ЗАВЕРШЕНА'} | Дедлайн:${deadlineStr}`,
+      `ОПИСАНИЕ: ${t.description ? t.description.slice(0, 250) : '(нет)'}`,
+      `ЧЕКЛИСТЫ: ${checklistText}`,
+      `ПОДЗАДАЧИ: ${subtaskText}`,
+      `ЧАТ: ${chatText}`,
+      t.parentTask ? `РОДИТЕЛЬ: ${t.parentTask.title} (${t.parentTask.completed ? '✓' : 'в работе'})` : null,
+      crossText ? `СВЯЗИ: ${crossText}` : null,
     ].filter(v => v !== null).join('\n');
   }).join('\n\n');
 
