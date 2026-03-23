@@ -99,8 +99,12 @@
                       <span class="search-task-field-label">→ Далее</span>
                       <span>{{ t.nextSteps }}</span>
                     </div>
+                    <div v-if="t.chatSummary" class="search-task-field search-task-chat">
+                      <span class="search-task-field-label">💬 Чат</span>
+                      <span>{{ t.chatSummary }}</span>
+                    </div>
                     <div v-if="t.dependencies" class="search-task-field search-task-blocker">
-                      <span class="search-task-field-label">🔗 Зависимости</span>
+                      <span class="search-task-field-label">🔗 Связи</span>
                       <span>{{ t.dependencies }}</span>
                     </div>
                     <div v-if="t.related" class="search-task-field search-task-related">

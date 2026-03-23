@@ -63,6 +63,7 @@ export interface SearchTaskResult {
   currentState: string;
   status: string;
   progressDetail: string;
+  chatSummary: string | null;
   dependencies: string | null;
   nextSteps: string | null;
   related: string | null;

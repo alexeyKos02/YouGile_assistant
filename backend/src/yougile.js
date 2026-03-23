@@ -40,6 +40,17 @@ export async function getTaskById(taskId) {
   return request('GET', `/tasks/${taskId}`);
 }
 
+export async function getTaskMessages(taskId) {
+  try {
+    const data = await request('GET', `/chats/${taskId}/messages?limit=50`);
+    return (data.content ?? [])
+      .filter(m => m.text && m.text.trim().length > 2)
+      .map(m => ({ text: m.text.trim(), createdAt: m.timestamp ?? null }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getSubtaskDetails(subtaskIds = []) {
   if (!subtaskIds.length) return [];
   const results = await Promise.allSettled(

@@ -602,3 +602,6 @@ body { margin: 0; min-height: 100svh; }
 .search-task-next .search-task-field-label  { color: #7c6ef5; }
 .search-task-next                           { color: var(--text); }
 .search-task-related                        { color: var(--text-muted); font-size: 12px; }
+
+.search-task-chat .search-task-field-label { color: #7eb8f7; }
+.search-task-chat { color: var(--text); }
