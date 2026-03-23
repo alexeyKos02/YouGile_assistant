@@ -107,8 +107,8 @@ export async function searchTasks(query, tasks, totalTasksInProject = 0) {
     // Chat messages
     const chatText = (t.chatMessages ?? []).length > 0
       ? (t.chatMessages ?? [])
-          .slice(0, 20)
-          .map(m => `  > "${m.text.slice(0, 250)}"`)
+          .slice(0, 10)
+          .map(m => `  > "${m.text.slice(0, 150)}"`)
           .join('\n')
       : '  (чат пустой — сообщений нет)';
 
@@ -134,7 +134,7 @@ export async function searchTasks(query, tasks, totalTasksInProject = 0) {
       `╚══════════════════════════════════════`,
       ``,
       `ОПИСАНИЕ:`,
-      t.description ? t.description.slice(0, 1000) : '(описание не заполнено)',
+      t.description ? t.description.slice(0, 500) : '(описание не заполнено)',
       ``,
       `ЧЕКЛИСТЫ:`,
       checklistText,

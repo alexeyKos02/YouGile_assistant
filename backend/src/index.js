@@ -145,9 +145,9 @@ app.post('/api/search', async (req, res) => {
       return { ...t, _score: score };
     }).filter(t => t._score > 0).sort((a, b) => b._score - a._score);
 
-    // 4. Enrich ALL relevant tasks (no artificial cap)
+    // 4. Enrich top 25 relevant tasks
     const enriched = await Promise.all(
-      scored.map(async t => {
+      scored.slice(0, 25).map(async t => {
         const subtaskDetails = await getSubtaskDetails(t.subtasks ?? []);
 
         // Chat messages for this task
