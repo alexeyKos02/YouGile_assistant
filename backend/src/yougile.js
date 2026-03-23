@@ -24,9 +24,8 @@ export async function getProjects() {
 export async function searchTasksByProject(projectId, query) {
   const q = (query ?? '').toLowerCase().trim();
 
-  // Fetch tasks by title (API supports title filter)
+  // Fetch tasks — limit 200, no extra filters (projectId not supported directly)
   const params = new URLSearchParams({ limit: '200' });
-  if (projectId) params.set('columnId', ''); // projectId не поддерживается напрямую — берём все
   const data = await request('GET', `/task-list?${params}`);
   const tasks = data.content ?? [];
 
