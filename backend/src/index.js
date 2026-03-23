@@ -3,7 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import { applyRules, computeDeadline } from './rules.js';
 import { generateTask } from './llm.js';
-import { createTask, getProjects, getBoardsForProject, getColumnsForBoard, getUsers, getStringStickers } from './yougile.js';
+import { createTask, getProjects, getBoardsForProject, getColumnsForBoard, getUsers, getStringStickers, searchTasksByProject, getTaskMessages, getSubtaskDetails } from './yougile.js';
+import { searchTasks } from './search.js';
 
 const app = express();
 app.use(cors());
@@ -110,6 +111,34 @@ app.get('/api/users', async (_req, res) => {
     res.json(result);
   } catch (err) {
     console.error('Users error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/search
+// Body: { query, projectId? }
+app.post('/api/search', async (req, res) => {
+  const { query, projectId } = req.body;
+  if (!query?.trim()) return res.status(400).json({ error: 'query is required' });
+
+  try {
+    // 1. Fetch relevant tasks from YouGile
+    const rawTasks = await searchTasksByProject(projectId, query.trim());
+
+    // 2. Enrich top 10 with comments + subtasks
+    const enriched = await Promise.all(
+      rawTasks.slice(0, 10).map(async t => ({
+        ...t,
+        comments: await getTaskMessages(t.id),
+        subtaskDetails: await getSubtaskDetails(t.subtasks ?? []),
+      }))
+    );
+
+    // 3. LLM summarize
+    const result = await searchTasks(query.trim(), enriched);
+    res.json(result);
+  } catch (err) {
+    console.error('Search error:', err);
     res.status(500).json({ error: err.message });
   }
 });

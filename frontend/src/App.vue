@@ -6,6 +6,104 @@
     </header>
 
     <main class="app-main">
+      <!-- Mode tabs -->
+      <div class="mode-tabs">
+        <button class="mode-tab" :class="{ active: mode === 'create' }" @click="mode = 'create'">
+          ✦ Создать задачу
+        </button>
+        <button class="mode-tab" :class="{ active: mode === 'search' }" @click="mode = 'search'">
+          ⌕ Умный поиск
+        </button>
+      </div>
+
+      <!-- ====== SEARCH MODE ====== -->
+      <template v-if="mode === 'search'">
+        <section class="input-section">
+          <div class="input-wrapper">
+            <input
+              v-model="searchQuery"
+              class="search-input"
+              placeholder="Например: МТС, выплаты, интеграция 1С..."
+              @keydown.enter="handleSearch"
+              :disabled="searching"
+            />
+          </div>
+          <div class="settings-row" style="margin-top:8px">
+            <div class="settings-field" style="max-width:280px">
+              <label class="field-label">Фильтр по проекту (опционально)</label>
+              <select class="select-input" v-model="searchProjectId" :disabled="loadingProjects">
+                <option value="">— все проекты —</option>
+                <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.title }}</option>
+              </select>
+            </div>
+          </div>
+          <button
+            class="btn btn-primary btn-generate"
+            @click="handleSearch"
+            :disabled="searching || !searchQuery.trim()"
+          >
+            <span v-if="searching" class="spinner" />
+            <span>{{ searching ? 'Ищу...' : 'Найти и объяснить' }}</span>
+          </button>
+        </section>
+
+        <div v-if="searchError" class="error-banner">{{ searchError }}</div>
+
+        <transition name="slide-up">
+          <section v-if="searchResult" class="result-section">
+            <div class="search-result-card">
+              <!-- Summary -->
+              <div class="search-summary">
+                <span class="search-summary-icon">🔍</span>
+                <p>{{ searchResult.summary }}</p>
+              </div>
+
+              <div v-if="searchResult.insufficientData" class="insufficient-data">
+                ℹ️ Данных недостаточно для полного анализа
+              </div>
+
+              <!-- Groups -->
+              <div v-for="group in searchResult.groups" :key="group.title" class="search-group">
+                <h3 class="search-group-title">{{ group.title }}</h3>
+                <div v-for="t in group.tasks" :key="t.id" class="search-task-card">
+                  <div class="search-task-header">
+                    <span class="search-task-title">{{ t.title }}</span>
+                    <span class="search-task-status" :class="statusClass(t.status)">{{ t.status }}</span>
+                  </div>
+                  <div class="search-task-brief">{{ t.brief }}</div>
+                  <div class="search-task-grid">
+                    <div v-if="t.whatsDone" class="search-task-field">
+                      <span class="search-task-field-label">Что делается</span>
+                      <span>{{ t.whatsDone }}</span>
+                    </div>
+                    <div v-if="t.progress" class="search-task-field">
+                      <span class="search-task-field-label">Прогресс</span>
+                      <span>{{ t.progress }}</span>
+                    </div>
+                    <div v-if="t.blockers" class="search-task-field search-task-blocker">
+                      <span class="search-task-field-label">⚠️ Блокеры</span>
+                      <span>{{ t.blockers }}</span>
+                    </div>
+                    <div v-if="t.related" class="search-task-field">
+                      <span class="search-task-field-label">Связанные</span>
+                      <span>{{ t.related }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="search-footer">
+                Найдено задач: {{ searchResult.totalFound }}
+                <button class="btn btn-ghost" style="margin-left:12px" @click="searchResult = null">✕ Сбросить</button>
+              </div>
+            </div>
+          </section>
+        </transition>
+      </template>
+
+      <!-- ====== CREATE MODE ====== -->
+      <template v-if="mode === 'create'">
+
       <!-- Input section -->
       <section class="input-section">
         <div class="input-wrapper">
@@ -198,14 +296,48 @@
           </div>
         </section>
       </transition>
+      </template><!-- end create mode -->
+
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import type { GeneratedTask, YouGileProject, YouGileBoard, YouGileColumn, YouGileUser, YouGileSticker } from './types';
-import { generateTask, createTask, getProjects, getBoards, getColumns, getUsers, getStickers } from './api';
+import type { GeneratedTask, YouGileProject, YouGileBoard, YouGileColumn, YouGileUser, YouGileSticker, SearchResult } from './types';
+import { generateTask, createTask, getProjects, getBoards, getColumns, getUsers, getStickers, searchTasks } from './api';
+
+// Mode
+const mode = ref<'create' | 'search'>('create');
+
+// Search
+const searchQuery = ref('');
+const searchProjectId = ref('');
+const searching = ref(false);
+const searchError = ref('');
+const searchResult = ref<SearchResult | null>(null);
+
+async function handleSearch() {
+  if (!searchQuery.value.trim() || searching.value) return;
+  searching.value = true;
+  searchError.value = '';
+  searchResult.value = null;
+  try {
+    searchResult.value = await searchTasks(searchQuery.value.trim(), searchProjectId.value || undefined);
+  } catch (e: unknown) {
+    searchError.value = e instanceof Error ? e.message : 'Ошибка поиска';
+  } finally {
+    searching.value = false;
+  }
+}
+
+function statusClass(status: string): string {
+  const s = status?.toLowerCase() ?? '';
+  if (s.includes('завершен') || s.includes('готов')) return 'status-done';
+  if (s.includes('блокир')) return 'status-blocked';
+  if (s.includes('работ')) return 'status-active';
+  return 'status-default';
+}
 
 const inputText = ref('');
 const task = ref<GeneratedTask | null>(null);

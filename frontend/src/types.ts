@@ -55,3 +55,26 @@ export interface YouGileUser {
   firstName?: string;
   lastName?: string;
 }
+
+export interface SearchTaskResult {
+  id: string;
+  title: string;
+  brief: string;
+  whatsDone: string;
+  status: string;
+  progress: string;
+  blockers: string | null;
+  related: string | null;
+}
+
+export interface SearchGroup {
+  title: string;
+  tasks: SearchTaskResult[];
+}
+
+export interface SearchResult {
+  summary: string;
+  groups: SearchGroup[];
+  totalFound: number;
+  insufficientData: boolean;
+}

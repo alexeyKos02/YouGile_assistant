@@ -21,6 +21,62 @@ export async function getProjects() {
   return request('GET', '/projects');
 }
 
+export async function searchTasksByProject(projectId, query) {
+  const q = (query ?? '').toLowerCase().trim();
+
+  // Fetch tasks by title (API supports title filter)
+  const params = new URLSearchParams({ limit: '200' });
+  if (projectId) params.set('columnId', ''); // projectId не поддерживается напрямую — берём все
+  const data = await request('GET', `/task-list?${params}`);
+  const tasks = data.content ?? [];
+
+  if (!q) return tasks.slice(0, 20);
+
+  // Client-side relevance scoring
+  const scored = tasks.map(t => {
+    let score = 0;
+    const title = (t.title ?? '').toLowerCase();
+    const desc = (t.description ?? '').toLowerCase();
+
+    // Точное вхождение в заголовок — высший приоритет
+    if (title.includes(q)) score += 20;
+    // Каждое слово запроса в заголовке
+    q.split(/\s+/).forEach(word => {
+      if (title.includes(word)) score += 5;
+      if (desc.includes(word)) score += 2;
+    });
+
+    return { ...t, _score: score };
+  }).filter(t => t._score > 0);
+
+  return scored.sort((a, b) => b._score - a._score).slice(0, 20);
+}
+
+export async function getTaskById(taskId) {
+  return request('GET', `/tasks/${taskId}`);
+}
+
+export async function getSubtaskDetails(subtaskIds = []) {
+  if (!subtaskIds.length) return [];
+  const results = await Promise.allSettled(
+    subtaskIds.slice(0, 5).map(id => request('GET', `/tasks/${id}`))
+  );
+  return results
+    .filter(r => r.status === 'fulfilled')
+    .map(r => ({ title: r.value.title, completed: r.value.completed }));
+}
+
+export async function getTaskMessages(taskId) {
+  try {
+    const data = await request('GET', `/chats/${taskId}/messages?limit=30`);
+    return (data.content ?? [])
+      .filter(m => m.text && !m.system)
+      .map(m => ({ text: m.text ?? '' }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getBoardsForProject(projectId) {
   if (!projectId) throw new Error('projectId is required');
   return request('GET', `/boards?projectId=${projectId}`);
