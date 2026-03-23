@@ -35,6 +35,13 @@ export async function getUsers() {
   return request('GET', '/users');
 }
 
+const PRIORITY_COLOR = {
+  critical: 'task-red',
+  high: 'task-yellow',
+  medium: 'task-blue',
+  low: 'task-gray',
+};
+
 export async function createTask({ title, description, checklist, priority, deadline, columnId, assigneeId }) {
   const columnIdToUse = columnId ?? process.env.YOUGILE_COLUMN_ID;
   if (!columnIdToUse) throw new Error('columnId is required');
@@ -43,6 +50,7 @@ export async function createTask({ title, description, checklist, priority, dead
     title,
     columnId: columnIdToUse,
     description: buildDescription(description, checklist),
+    color: PRIORITY_COLOR[priority] ?? 'task-primary',
   };
 
   if (deadline) {
