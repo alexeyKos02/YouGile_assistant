@@ -26,11 +26,22 @@ export async function getColumns() {
 
 export async function getColumnsForProject(projectId) {
   if (!projectId) throw new Error('projectId is required');
-  return request('GET', `/projects/${projectId}/sprints`);
+  return request('GET', `/sprints?projectId=${projectId}`);
 }
 
 export async function getUsers() {
-  return request('GET', '/employees');
+  // Users are embedded in project data, extract from all projects
+  const data = await request('GET', '/projects');
+  const projects = data.content ?? [];
+  const usersMap = {};
+  for (const project of projects) {
+    if (project.users) {
+      for (const [id] of Object.entries(project.users)) {
+        usersMap[id] = { id, name: id };
+      }
+    }
+  }
+  return { content: Object.values(usersMap) };
 }
 
 export async function createTask({ title, description, checklist, priority, deadline, columnId, assigneeId }) {
