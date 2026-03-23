@@ -63,7 +63,7 @@ export interface SearchTaskResult {
   currentState: string;
   status: string;
   progressDetail: string;
-  blockers: string | null;
+  dependencies: string | null;
   nextSteps: string | null;
   related: string | null;
 }

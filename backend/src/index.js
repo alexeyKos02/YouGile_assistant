@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { applyRules, computeDeadline } from './rules.js';
 import { generateTask } from './llm.js';
-import { createTask, getProjects, getBoardsForProject, getColumnsForBoard, getUsers, getStringStickers, searchTasksByProject, getTaskMessages, getSubtaskDetails } from './yougile.js';
+import { createTask, getProjects, getBoardsForProject, getColumnsForBoard, getUsers, getStringStickers, getAllTasks, getSubtaskDetails } from './yougile.js';
 import { searchTasks } from './search.js';
 
 const app = express();
@@ -118,24 +118,70 @@ app.get('/api/users', async (_req, res) => {
 // POST /api/search
 // Body: { query, projectId? }
 app.post('/api/search', async (req, res) => {
-  const { query, projectId } = req.body;
+  const { query } = req.body;
   if (!query?.trim()) return res.status(400).json({ error: 'query is required' });
 
   try {
-    // 1. Fetch relevant tasks from YouGile
-    const rawTasks = await searchTasksByProject(projectId, query.trim());
+    // 1. Fetch ALL tasks to build full context + dependency graph
+    const allTasks = await getAllTasks();
 
-    // 2. Enrich top 10 with comments + subtasks
+    // 2. Build lookup map id → task
+    const taskMap = Object.fromEntries(allTasks.map(t => [t.id, t]));
+
+    // 3. Score tasks by relevance to query
+    const q = query.trim().toLowerCase();
+    const words = q.split(/\s+/).filter(Boolean);
+
+    const scored = allTasks.map(t => {
+      let score = 0;
+      const title = (t.title ?? '').toLowerCase();
+      const desc  = (t.description ?? '').toLowerCase();
+
+      if (title.includes(q)) score += 30;
+      words.forEach(w => {
+        if (title.includes(w)) score += 8;
+        if (desc.includes(w))  score += 3;
+      });
+      return { ...t, _score: score };
+    }).filter(t => t._score > 0).sort((a, b) => b._score - a._score);
+
+    // 4. Take top 15, enrich with full subtask details
+    const relevant = scored.slice(0, 15);
     const enriched = await Promise.all(
-      rawTasks.slice(0, 10).map(async t => ({
-        ...t,
-        comments: await getTaskMessages(t.id),
-        subtaskDetails: await getSubtaskDetails(t.subtasks ?? []),
-      }))
+      relevant.map(async t => {
+        const subtaskDetails = await getSubtaskDetails(t.subtasks ?? []);
+
+        // Find parent task if this is a subtask
+        const parentTask = allTasks.find(p =>
+          Array.isArray(p.subtasks) && p.subtasks.includes(t.id)
+        );
+
+        // Find sibling tasks (other subtasks of same parent)
+        const siblings = parentTask
+          ? (parentTask.subtasks ?? [])
+              .filter(sid => sid !== t.id)
+              .map(sid => taskMap[sid])
+              .filter(Boolean)
+              .map(s => ({ title: s.title, completed: s.completed }))
+          : [];
+
+        return {
+          id: t.id,
+          title: t.title,
+          description: t.description,
+          columnTitle: t.columnTitle,
+          completed: t.completed,
+          deadline: t.deadline,
+          checklists: t.checklists,
+          subtaskDetails,
+          parentTask: parentTask ? { id: parentTask.id, title: parentTask.title, completed: parentTask.completed } : null,
+          siblings,
+        };
+      })
     );
 
-    // 3. LLM summarize
-    const result = await searchTasks(query.trim(), enriched);
+    // 5. LLM summarize with full context
+    const result = await searchTasks(query.trim(), enriched, allTasks.length);
     res.json(result);
   } catch (err) {
     console.error('Search error:', err);

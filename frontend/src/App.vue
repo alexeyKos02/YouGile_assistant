@@ -99,9 +99,9 @@
                       <span class="search-task-field-label">→ Далее</span>
                       <span>{{ t.nextSteps }}</span>
                     </div>
-                    <div v-if="t.blockers" class="search-task-field search-task-blocker">
-                      <span class="search-task-field-label">⚠️ Блокер</span>
-                      <span>{{ t.blockers }}</span>
+                    <div v-if="t.dependencies" class="search-task-field search-task-blocker">
+                      <span class="search-task-field-label">🔗 Зависимости</span>
+                      <span>{{ t.dependencies }}</span>
                     </div>
                     <div v-if="t.related" class="search-task-field search-task-related">
                       <span class="search-task-field-label">Подзадачи</span>
