@@ -26,7 +26,7 @@ export async function getColumns() {
 
 export async function getColumnsForProject(projectId) {
   if (!projectId) throw new Error('projectId is required');
-  return request('GET', `/sprints?projectId=${projectId}`);
+  return request('GET', `/columns?projectId=${projectId}`);
 }
 
 export async function getUsers() {
