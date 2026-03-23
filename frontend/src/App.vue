@@ -113,22 +113,20 @@
             <!-- Title -->
             <div class="field">
               <label class="field-label">Заголовок</label>
-              <div
+              <input
                 class="field-value title-value"
-                contenteditable="true"
-                @blur="(e) => task && (task.title = (e.target as HTMLElement).innerText)"
-              >{{ task.title }}</div>
+                v-model="task.title"
+              />
             </div>
 
             <!-- Description -->
             <div class="field">
               <label class="field-label">Описание</label>
-              <div
+              <textarea
                 class="field-value desc-value"
-                contenteditable="true"
-                @blur="(e) => task && (task.description = (e.target as HTMLElement).innerText)"
-              >{{ task.description }}</div>
-            </div>
+                v-model="task.description"
+                rows="4"
+              /></div>
 
             <!-- Checklist -->
             <div v-if="task.checklist?.length" class="field">
@@ -136,10 +134,10 @@
               <ul class="checklist">
                 <li v-for="(item, i) in task.checklist" :key="i" class="checklist-item">
                   <span class="check-box">☐</span>
-                  <span
-                    contenteditable="true"
-                    @blur="(e) => task && (task.checklist[i] = (e.target as HTMLElement).innerText)"
-                  >{{ item }}</span>
+                  <input
+                    class="checklist-input"
+                    v-model="task.checklist[i]"
+                  />
                 </li>
               </ul>
             </div>
