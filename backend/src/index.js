@@ -45,13 +45,13 @@ app.post('/api/generate', async (req, res) => {
 // Body: { title, description, checklist, priority, deadline, columnId?, assigneeId? }
 // Returns: { id, url }
 app.post('/api/create', async (req, res) => {
-  const { title, description, checklist, priority, deadline, columnId, assigneeId } = req.body;
+  const { title, description, checklist, priority, deadline, columnId, assigneeId, stickers } = req.body;
   if (!title) {
     return res.status(400).json({ error: 'title is required' });
   }
 
   try {
-    const result = await createTask({ title, description, checklist, priority, deadline, columnId, assigneeId });
+    const result = await createTask({ title, description, checklist, priority, deadline, columnId, assigneeId, stickers });
     res.json(result);
   } catch (err) {
     console.error('Create error:', err);
