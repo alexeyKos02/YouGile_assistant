@@ -60,20 +60,23 @@ export interface SearchTaskResult {
   id: string;
   title: string;
   brief: string;
-  whatsDone: string;
+  currentState: string;
   status: string;
-  progress: string;
+  progressDetail: string;
   blockers: string | null;
+  nextSteps: string | null;
   related: string | null;
 }
 
 export interface SearchGroup {
   title: string;
+  groupSummary: string;
   tasks: SearchTaskResult[];
 }
 
 export interface SearchResult {
   summary: string;
+  overallHealth: 'good' | 'warning' | 'critical';
   groups: SearchGroup[];
   totalFound: number;
   insufficientData: boolean;

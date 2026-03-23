@@ -52,40 +52,59 @@
         <transition name="slide-up">
           <section v-if="searchResult" class="result-section">
             <div class="search-result-card">
-              <!-- Summary -->
-              <div class="search-summary">
-                <span class="search-summary-icon">🔍</span>
-                <p>{{ searchResult.summary }}</p>
+              <!-- Health + Summary -->
+              <div class="search-summary" :class="`health-${searchResult.overallHealth}`">
+                <span class="search-summary-icon">{{
+                  searchResult.overallHealth === 'good' ? '✅' :
+                  searchResult.overallHealth === 'critical' ? '🔴' : '⚠️'
+                }}</span>
+                <div>
+                  <div class="search-health-label">{{
+                    searchResult.overallHealth === 'good' ? 'Всё идёт хорошо' :
+                    searchResult.overallHealth === 'critical' ? 'Есть серьёзные проблемы' : 'Есть риски'
+                  }}</div>
+                  <p>{{ searchResult.summary }}</p>
+                </div>
               </div>
 
               <div v-if="searchResult.insufficientData" class="insufficient-data">
-                ℹ️ Данных недостаточно для полного анализа
+                ℹ️ Данных недостаточно для полного анализа — задачи могут не содержать описаний или комментариев
               </div>
 
               <!-- Groups -->
               <div v-for="group in searchResult.groups" :key="group.title" class="search-group">
-                <h3 class="search-group-title">{{ group.title }}</h3>
+                <div class="search-group-header">
+                  <h3 class="search-group-title">{{ group.title }}</h3>
+                  <p v-if="group.groupSummary" class="search-group-summary">{{ group.groupSummary }}</p>
+                </div>
+
                 <div v-for="t in group.tasks" :key="t.id" class="search-task-card">
                   <div class="search-task-header">
                     <span class="search-task-title">{{ t.title }}</span>
                     <span class="search-task-status" :class="statusClass(t.status)">{{ t.status }}</span>
                   </div>
+
                   <div class="search-task-brief">{{ t.brief }}</div>
+
                   <div class="search-task-grid">
-                    <div v-if="t.whatsDone" class="search-task-field">
-                      <span class="search-task-field-label">Что делается</span>
-                      <span>{{ t.whatsDone }}</span>
+                    <div v-if="t.currentState" class="search-task-field">
+                      <span class="search-task-field-label">Сейчас</span>
+                      <span>{{ t.currentState }}</span>
                     </div>
-                    <div v-if="t.progress" class="search-task-field">
+                    <div v-if="t.progressDetail" class="search-task-field">
                       <span class="search-task-field-label">Прогресс</span>
-                      <span>{{ t.progress }}</span>
+                      <span>{{ t.progressDetail }}</span>
+                    </div>
+                    <div v-if="t.nextSteps" class="search-task-field search-task-next">
+                      <span class="search-task-field-label">→ Далее</span>
+                      <span>{{ t.nextSteps }}</span>
                     </div>
                     <div v-if="t.blockers" class="search-task-field search-task-blocker">
-                      <span class="search-task-field-label">⚠️ Блокеры</span>
+                      <span class="search-task-field-label">⚠️ Блокер</span>
                       <span>{{ t.blockers }}</span>
                     </div>
-                    <div v-if="t.related" class="search-task-field">
-                      <span class="search-task-field-label">Связанные</span>
+                    <div v-if="t.related" class="search-task-field search-task-related">
+                      <span class="search-task-field-label">Подзадачи</span>
                       <span>{{ t.related }}</span>
                     </div>
                   </div>

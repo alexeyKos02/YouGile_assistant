@@ -576,3 +576,29 @@ body { margin: 0; min-height: 100svh; }
   border-top: 1px solid var(--border);
   padding-top: 14px;
 }
+
+/* Health states */
+.health-good    { border-color: rgba(74,222,128,0.3) !important; background: rgba(74,222,128,0.07) !important; }
+.health-warning { border-color: rgba(245,166,35,0.3) !important; background: rgba(245,166,35,0.07) !important; }
+.health-critical{ border-color: rgba(245,90,110,0.3) !important; background: rgba(245,90,110,0.07) !important; }
+
+.search-health-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.search-group-header { margin-bottom: 10px; }
+.search-group-summary {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.search-task-next .search-task-field-label  { color: #7c6ef5; }
+.search-task-next                           { color: var(--text); }
+.search-task-related                        { color: var(--text-muted); font-size: 12px; }
