@@ -340,8 +340,9 @@ import { generateTask, createTask, getProjects, getBoards, getColumns, getUsers,
 const mode = ref<'create' | 'search'>('create');
 
 // Model
-const selectedModel = ref('gpt-4o');
+const selectedModel = ref('');
 const MODELS = [
+  { value: '',            label: 'Авто (из настроек сервера)' },
   { value: 'gpt-4o',      label: 'GPT-4o (быстрый)' },
   { value: 'gpt-4o-mini', label: 'GPT-4o mini (дешёвый)' },
   { value: 'o4-mini',     label: 'o4-mini (думает)' },

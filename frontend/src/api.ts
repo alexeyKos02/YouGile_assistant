@@ -21,7 +21,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export function generateTask(text: string, model?: string): Promise<GeneratedTask> {
-  return post<GeneratedTask>('/api/generate', { text, model });
+  return post<GeneratedTask>('/api/generate', { text, model: model || undefined });
 }
 
 export function createTask(task: GeneratedTask): Promise<CreateResult> {
@@ -44,7 +44,7 @@ export async function getColumns(boardId: string): Promise<YouGileColumn[]> {
 }
 
 export async function searchTasks(query: string, projectId?: string, model?: string): Promise<SearchResult> {
-  return post<SearchResult>('/api/search', { query, projectId, model });
+  return post<SearchResult>('/api/search', { query, projectId, model: model || undefined });
 }
 
 export async function getStickers(boardId: string): Promise<YouGileSticker[]> {
