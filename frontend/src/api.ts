@@ -20,8 +20,8 @@ async function get<T>(path: string): Promise<T> {
   return data as T;
 }
 
-export function generateTask(text: string): Promise<GeneratedTask> {
-  return post<GeneratedTask>('/api/generate', { text });
+export function generateTask(text: string, model?: string): Promise<GeneratedTask> {
+  return post<GeneratedTask>('/api/generate', { text, model });
 }
 
 export function createTask(task: GeneratedTask): Promise<CreateResult> {
@@ -43,8 +43,8 @@ export async function getColumns(boardId: string): Promise<YouGileColumn[]> {
   return Array.isArray(data) ? data : (data.content ?? []);
 }
 
-export async function searchTasks(query: string, projectId?: string): Promise<SearchResult> {
-  return post<SearchResult>('/api/search', { query, projectId });
+export async function searchTasks(query: string, projectId?: string, model?: string): Promise<SearchResult> {
+  return post<SearchResult>('/api/search', { query, projectId, model });
 }
 
 export async function getStickers(boardId: string): Promise<YouGileSticker[]> {

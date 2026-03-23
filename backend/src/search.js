@@ -75,7 +75,7 @@ const SEARCH_PROMPT = `Ты — опытный тимлид, который де
   "insufficientData": true если у большинства задач нет описаний чеклистов и чата, иначе false
 }`;
 
-export async function searchTasks(query, tasks, totalTasksInProject = 0) {
+export async function searchTasks(query, tasks, totalTasksInProject = 0, model = null) {
   if (!tasks || tasks.length === 0) {
     return {
       summary: `По запросу "${query}" задачи не найдены. Попробуйте другой запрос.`,
@@ -161,63 +161,69 @@ export async function searchTasks(query, tasks, totalTasksInProject = 0) {
     tasksText,
   ].join('\n');
 
+  const selectedModel = model ?? process.env.OPENAI_MODEL ?? 'gpt-4o';
+  const isReasoningModel = /^(o\d|gpt-5)/.test(selectedModel);
+
   const response = await client.chat.completions.create({
-    model: process.env.OPENAI_MODEL ?? 'gpt-5',
+    model: selectedModel,
     messages: [
       { role: 'system', content: SEARCH_PROMPT },
       { role: 'user', content: userMessage },
     ],
-    max_completion_tokens: 8000,
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'search_result',
-        strict: false,
-        schema: {
-          type: 'object',
-          properties: {
-            summary: { type: 'string' },
-            overallHealth: { type: 'string' },
-            groups: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  title: { type: 'string' },
-                  groupSummary: { type: 'string' },
-                  tasks: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        id: { type: 'string' },
-                        title: { type: 'string' },
-                        brief: { type: 'string' },
-                        currentState: { type: 'string' },
-                        status: { type: 'string' },
-                        progressDetail: { type: 'string' },
-                        chatSummary: { type: ['string', 'null'] },
-                        dependencies: { type: ['string', 'null'] },
-                        nextSteps: { type: ['string', 'null'] },
-                        related: { type: ['string', 'null'] },
+    max_completion_tokens: isReasoningModel ? 25000 : 8000,
+    ...(isReasoningModel ? { reasoning_effort: 'medium' } : { temperature: 0.15 }),
+    response_format: isReasoningModel
+      ? {
+          type: 'json_schema',
+          json_schema: {
+            name: 'search_result',
+            strict: false,
+            schema: {
+              type: 'object',
+              properties: {
+                summary: { type: 'string' },
+                overallHealth: { type: 'string' },
+                groups: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      title: { type: 'string' },
+                      groupSummary: { type: 'string' },
+                      tasks: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            title: { type: 'string' },
+                            brief: { type: 'string' },
+                            currentState: { type: 'string' },
+                            status: { type: 'string' },
+                            progressDetail: { type: 'string' },
+                            chatSummary: { type: ['string', 'null'] },
+                            dependencies: { type: ['string', 'null'] },
+                            nextSteps: { type: ['string', 'null'] },
+                            related: { type: ['string', 'null'] },
+                          },
+                          required: ['id', 'title', 'brief', 'currentState', 'status', 'progressDetail', 'chatSummary', 'dependencies', 'nextSteps', 'related'],
+                          additionalProperties: false,
+                        },
                       },
-                      required: ['id', 'title', 'brief', 'currentState', 'status', 'progressDetail', 'chatSummary', 'dependencies', 'nextSteps', 'related'],
-                      additionalProperties: false,
                     },
+                    required: ['title', 'groupSummary', 'tasks'],
+                    additionalProperties: false,
                   },
                 },
-                required: ['title', 'groupSummary', 'tasks'],
-                additionalProperties: false,
+                totalFound: { type: 'number' },
+                insufficientData: { type: 'boolean' },
               },
+              required: ['summary', 'overallHealth', 'groups', 'totalFound', 'insufficientData'],
+              additionalProperties: false,
             },
-            totalFound: { type: 'number' },
-            insufficientData: { type: 'boolean' },
           },
-          required: ['summary', 'overallHealth', 'groups', 'totalFound', 'insufficientData'],
-          additionalProperties: false,
-        },
-      },
-    },
+        }
+      : { type: 'json_object' },
   });
 
   return JSON.parse(response.choices[0].message.content);

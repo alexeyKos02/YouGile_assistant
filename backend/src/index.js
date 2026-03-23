@@ -14,7 +14,7 @@ app.use(express.json());
 // Body: { text: string }
 // Returns: structured task object
 app.post('/api/generate', async (req, res) => {
-  const { text } = req.body;
+  const { text, model } = req.body;
   if (!text || text.trim().length === 0) {
     return res.status(400).json({ error: 'text is required' });
   }
@@ -23,7 +23,7 @@ app.post('/api/generate', async (req, res) => {
     const hints = applyRules(text);
     hints.deadline = computeDeadline(hints.deadlineDays);
 
-    const task = await generateTask(text, hints);
+    const task = await generateTask(text, hints, model ?? null);
 
     // Merge rule-derived data as fallback/override
     const result = {
@@ -118,7 +118,7 @@ app.get('/api/users', async (_req, res) => {
 // POST /api/search
 // Body: { query, projectId? }
 app.post('/api/search', async (req, res) => {
-  const { query } = req.body;
+  const { query, model } = req.body;
   if (!query?.trim()) return res.status(400).json({ error: 'query is required' });
 
   try {
@@ -202,7 +202,7 @@ app.post('/api/search', async (req, res) => {
     });
 
     // 5. LLM summarize with full context
-    const result = await searchTasks(query.trim(), enriched, allTasks.length);
+    const result = await searchTasks(query.trim(), enriched, allTasks.length, model ?? null);
     res.json(result);
   } catch (err) {
     console.error('Search error:', err);

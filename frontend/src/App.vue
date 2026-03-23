@@ -3,6 +3,12 @@
     <header class="app-header">
       <div class="logo">⚡ YouGile AI</div>
       <p class="subtitle">Опишите задачу — ИИ сделает всё остальное</p>
+      <div class="model-selector">
+        <label class="model-label">Модель:</label>
+        <select class="model-select" v-model="selectedModel">
+          <option v-for="m in MODELS" :key="m.value" :value="m.value">{{ m.label }}</option>
+        </select>
+      </div>
     </header>
 
     <main class="app-main">
@@ -333,6 +339,15 @@ import { generateTask, createTask, getProjects, getBoards, getColumns, getUsers,
 // Mode
 const mode = ref<'create' | 'search'>('create');
 
+// Model
+const selectedModel = ref('gpt-4o');
+const MODELS = [
+  { value: 'gpt-4o',      label: 'GPT-4o (быстрый)' },
+  { value: 'gpt-4o-mini', label: 'GPT-4o mini (дешёвый)' },
+  { value: 'o4-mini',     label: 'o4-mini (думает)' },
+  { value: 'gpt-5',       label: 'GPT-5 (умный)' },
+];
+
 // Search
 const searchQuery = ref('');
 const searchProjectId = ref('');
@@ -346,7 +361,7 @@ async function handleSearch() {
   searchError.value = '';
   searchResult.value = null;
   try {
-    searchResult.value = await searchTasks(searchQuery.value.trim(), searchProjectId.value || undefined);
+    searchResult.value = await searchTasks(searchQuery.value.trim(), searchProjectId.value || undefined, selectedModel.value);
   } catch (e: unknown) {
     searchError.value = e instanceof Error ? e.message : 'Ошибка поиска';
   } finally {
@@ -460,7 +475,7 @@ async function handleGenerate() {
   loading.value = true;
   task.value = null;
   try {
-    task.value = await generateTask(inputText.value.trim());
+    task.value = await generateTask(inputText.value.trim(), selectedModel.value);
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Ошибка генерации';
   } finally {
@@ -549,3 +564,35 @@ function userLabel(u: YouGileUser): string {
   return u.email;
 }
 </script>
+
+<style scoped>
+.model-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.model-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 500;
+}
+.model-select {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  padding: 4px 10px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.model-select:hover {
+  border-color: rgba(255,255,255,0.5);
+}
+.model-select option {
+  background: #1e1e2e;
+  color: #fff;
+}
+</style>
