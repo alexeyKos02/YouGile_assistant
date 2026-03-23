@@ -195,8 +195,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import type { GeneratedTask, YouGileProject, YouGileBoard, YouGileColumn, YouGileUser } from './types';
-import { generateTask, createTask, getProjects, getBoards, getColumns, getUsers } from './api';
+import type { GeneratedTask, YouGileProject, YouGileBoard, YouGileColumn, YouGileUser, YouGileSticker } from './types';
+import { generateTask, createTask, getProjects, getBoards, getColumns, getUsers, getStickers } from './api';
 
 const inputText = ref('');
 const task = ref<GeneratedTask | null>(null);
@@ -220,6 +220,7 @@ const loadingBoards = ref(false);
 const loadingColumns = ref(false);
 const loadingUsers = ref(false);
 const settingsError = ref('');
+const prioritySticker = ref<YouGileSticker | null>(null);
 
 onMounted(async () => {
   await Promise.all([loadProjects(), loadUsers()]);
@@ -268,11 +269,17 @@ async function onProjectChange() {
 async function onBoardChange() {
   selectedColumnId.value = '';
   columns.value = [];
+  prioritySticker.value = null;
   if (!selectedBoardId.value) return;
 
   loadingColumns.value = true;
   try {
-    columns.value = await getColumns(selectedBoardId.value);
+    const [cols, stickers] = await Promise.all([
+      getColumns(selectedBoardId.value),
+      getStickers(selectedBoardId.value),
+    ]);
+    columns.value = cols;
+    prioritySticker.value = stickers.find(s => s.name === 'Приоритет') ?? null;
   } catch (e) {
     settingsError.value = 'Не удалось загрузить колонки доски.';
   } finally {
@@ -300,10 +307,23 @@ async function handleCreate() {
   creating.value = true;
   error.value = '';
   try {
+    const stickers: Record<string, string> = {};
+    if (prioritySticker.value && task.value.priority) {
+      const PRIORITY_NAMES: Record<string, string[]> = {
+        critical: ['Критический', 'Критичный', 'Critical'],
+        high:     ['Высокий', 'High'],
+        medium:   ['Средний', 'Medium', 'Нормальный'],
+        low:      ['Низкий', 'Low'],
+      };
+      const names = PRIORITY_NAMES[task.value.priority] ?? [];
+      const state = prioritySticker.value.states.find(s => names.includes(s.name));
+      if (state) stickers[prioritySticker.value.id] = state.id;
+    }
     const taskToCreate = {
       ...task.value,
       columnId: selectedColumnId.value || undefined,
       assigneeId: selectedAssigneeId.value || undefined,
+      stickers: Object.keys(stickers).length ? stickers : undefined,
     };
     const result = await createTask(taskToCreate);
     createSuccess.value = result.id ?? 'создана';

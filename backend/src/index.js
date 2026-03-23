@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { applyRules, computeDeadline } from './rules.js';
 import { generateTask } from './llm.js';
-import { createTask, getProjects, getBoardsForProject, getColumnsForBoard, getUsers } from './yougile.js';
+import { createTask, getProjects, getBoardsForProject, getColumnsForBoard, getUsers, getStringStickers } from './yougile.js';
 
 const app = express();
 app.use(cors());
@@ -88,6 +88,17 @@ app.get('/api/columns/:boardId', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('Columns error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/stickers/:boardId
+app.get('/api/stickers/:boardId', async (req, res) => {
+  try {
+    const result = await getStringStickers(req.params.boardId);
+    res.json(result);
+  } catch (err) {
+    console.error('Stickers error:', err);
     res.status(500).json({ error: err.message });
   }
 });

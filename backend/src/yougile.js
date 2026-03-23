@@ -35,14 +35,12 @@ export async function getUsers() {
   return request('GET', '/users');
 }
 
-const PRIORITY_COLOR = {
-  critical: 'task-red',
-  high: 'task-yellow',
-  medium: 'task-blue',
-  low: 'task-gray',
-};
+export async function getStringStickers(boardId) {
+  if (!boardId) throw new Error('boardId is required');
+  return request('GET', `/string-stickers?boardId=${boardId}`);
+}
 
-export async function createTask({ title, description, checklist, priority, deadline, columnId, assigneeId }) {
+export async function createTask({ title, description, checklist, priority, deadline, columnId, assigneeId, stickers }) {
   const columnIdToUse = columnId ?? process.env.YOUGILE_COLUMN_ID;
   if (!columnIdToUse) throw new Error('columnId is required');
 
@@ -50,8 +48,11 @@ export async function createTask({ title, description, checklist, priority, dead
     title,
     columnId: columnIdToUse,
     description: buildDescription(description, checklist),
-    color: PRIORITY_COLOR[priority] ?? 'task-primary',
   };
+
+  if (stickers && Object.keys(stickers).length > 0) {
+    body.stickers = stickers;
+  }
 
   if (deadline) {
     body.deadline = { deadline: new Date(deadline).getTime() };

@@ -12,6 +12,7 @@ export interface GeneratedTask {
   labels: string[];
   columnId?: string;
   assigneeId?: string;
+  stickers?: Record<string, string>;
 }
 
 export interface CreateResult {
@@ -33,6 +34,18 @@ export interface YouGileColumn {
   id: string;
   title: string;
   name?: string;
+}
+
+export interface YouGileStickerState {
+  id: string;
+  name: string;
+  color?: string;
+}
+
+export interface YouGileSticker {
+  id: string;
+  name: string;
+  states: YouGileStickerState[];
 }
 
 export interface YouGileUser {
