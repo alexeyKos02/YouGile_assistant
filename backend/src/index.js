@@ -180,6 +180,12 @@ app.post('/api/search', async (req, res) => {
       })
     );
 
+    // DEBUG: log what we're sending to LLM
+    console.log(`[search] query="${query}" totalTasks=${allTasks.length} relevant=${enriched.length}`);
+    enriched.forEach(t => {
+      console.log(`  TASK: "${t.title}" | col="${t.columnTitle}" | completed=${t.completed} | desc=${t.description?.length ?? 0}chars | subtasks=${t.subtaskDetails?.length ?? 0} | checklists=${t.checklists?.length ?? 0}`);
+    });
+
     // 5. LLM summarize with full context
     const result = await searchTasks(query.trim(), enriched, allTasks.length);
     res.json(result);
