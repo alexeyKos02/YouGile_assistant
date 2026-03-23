@@ -151,6 +151,15 @@
               </ul>
             </div>
 
+            <!-- Priority sticker -->
+            <div v-if="prioritySticker" class="field field-inline">
+              <label class="field-label">Стикер «{{ prioritySticker.name }}»</label>
+              <select class="select-input select-inline" v-model="selectedPriorityStickerStateId">
+                <option value="">— не выставлять —</option>
+                <option v-for="s in prioritySticker.states" :key="s.id" :value="s.id">{{ s.name }}</option>
+              </select>
+            </div>
+
             <!-- Deadline -->
             <div class="field field-inline">
               <label class="field-label">Дедлайн</label>
@@ -221,6 +230,7 @@ const loadingColumns = ref(false);
 const loadingUsers = ref(false);
 const settingsError = ref('');
 const prioritySticker = ref<YouGileSticker | null>(null);
+const selectedPriorityStickerStateId = ref('');
 
 onMounted(async () => {
   await Promise.all([loadProjects(), loadUsers()]);
@@ -280,6 +290,7 @@ async function onBoardChange() {
     ]);
     columns.value = cols;
     prioritySticker.value = stickers.find(s => s.name === 'Приоритет') ?? null;
+    selectedPriorityStickerStateId.value = '';
   } catch (e) {
     settingsError.value = 'Не удалось загрузить колонки доски.';
   } finally {
@@ -308,16 +319,8 @@ async function handleCreate() {
   error.value = '';
   try {
     const stickers: Record<string, string> = {};
-    if (prioritySticker.value && task.value.priority) {
-      const PRIORITY_NAMES: Record<string, string[]> = {
-        critical: ['Критический', 'Критичный', 'Critical'],
-        high:     ['Высокий', 'High'],
-        medium:   ['Средний', 'Medium', 'Нормальный'],
-        low:      ['Низкий', 'Low'],
-      };
-      const names = PRIORITY_NAMES[task.value.priority] ?? [];
-      const state = prioritySticker.value.states.find(s => names.includes(s.name));
-      if (state) stickers[prioritySticker.value.id] = state.id;
+    if (prioritySticker.value && selectedPriorityStickerStateId.value) {
+      stickers[prioritySticker.value.id] = selectedPriorityStickerStateId.value;
     }
     const taskToCreate = {
       ...task.value,
