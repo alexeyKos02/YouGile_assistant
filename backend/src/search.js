@@ -167,9 +167,26 @@ export async function searchTasks(query, tasks, totalTasksInProject = 0) {
       { role: 'system', content: SEARCH_PROMPT },
       { role: 'user', content: userMessage },
     ],
-    temperature: 0.15,
     max_completion_tokens: 8000,
-    response_format: { type: 'json_object' },
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'search_result',
+        strict: false,
+        schema: {
+          type: 'object',
+          properties: {
+            summary: { type: 'string' },
+            overallHealth: { type: 'string' },
+            groups: { type: 'array' },
+            totalFound: { type: 'number' },
+            insufficientData: { type: 'boolean' },
+          },
+          required: ['summary', 'overallHealth', 'groups', 'totalFound', 'insufficientData'],
+          additionalProperties: false,
+        },
+      },
+    },
   });
 
   return JSON.parse(response.choices[0].message.content);

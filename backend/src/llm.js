@@ -41,9 +41,27 @@ export async function generateTask(rawText, hints) {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
     ],
-    temperature: 0.4,
     max_completion_tokens: 800,
-    response_format: { type: 'json_object' },
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'task',
+        strict: true,
+        schema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            description: { type: 'string' },
+            checklist: { type: 'array', items: { type: 'string' } },
+            priority: { type: 'string' },
+            type: { type: 'string' },
+            deadline: { type: 'string' },
+          },
+          required: ['title', 'description', 'checklist', 'priority', 'type', 'deadline'],
+          additionalProperties: false,
+        },
+      },
+    },
   });
 
   const content = response.choices[0].message.content;
