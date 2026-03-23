@@ -178,7 +178,38 @@ export async function searchTasks(query, tasks, totalTasksInProject = 0) {
           properties: {
             summary: { type: 'string' },
             overallHealth: { type: 'string' },
-            groups: { type: 'array' },
+            groups: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  groupSummary: { type: 'string' },
+                  tasks: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string' },
+                        title: { type: 'string' },
+                        brief: { type: 'string' },
+                        currentState: { type: 'string' },
+                        status: { type: 'string' },
+                        progressDetail: { type: 'string' },
+                        chatSummary: { type: ['string', 'null'] },
+                        dependencies: { type: ['string', 'null'] },
+                        nextSteps: { type: ['string', 'null'] },
+                        related: { type: ['string', 'null'] },
+                      },
+                      required: ['id', 'title', 'brief', 'currentState', 'status', 'progressDetail', 'chatSummary', 'dependencies', 'nextSteps', 'related'],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ['title', 'groupSummary', 'tasks'],
+                additionalProperties: false,
+              },
+            },
             totalFound: { type: 'number' },
             insufficientData: { type: 'boolean' },
           },
