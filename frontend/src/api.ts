@@ -1,4 +1,4 @@
-import type { GeneratedTask, CreateResult, YouGileProject, YouGileColumn, YouGileUser } from './types';
+import type { GeneratedTask, CreateResult, YouGileProject, YouGileBoard, YouGileColumn, YouGileUser } from './types';
 
 const BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -33,8 +33,13 @@ export async function getProjects(): Promise<YouGileProject[]> {
   return Array.isArray(data) ? data : (data.content ?? []);
 }
 
-export async function getColumns(projectId: string): Promise<YouGileColumn[]> {
-  const data = await get<{ content?: YouGileColumn[] } | YouGileColumn[]>(`/api/columns/${projectId}`);
+export async function getBoards(projectId: string): Promise<YouGileBoard[]> {
+  const data = await get<{ content?: YouGileBoard[] } | YouGileBoard[]>(`/api/boards/${projectId}`);
+  return Array.isArray(data) ? data : (data.content ?? []);
+}
+
+export async function getColumns(boardId: string): Promise<YouGileColumn[]> {
+  const data = await get<{ content?: YouGileColumn[] } | YouGileColumn[]>(`/api/columns/${boardId}`);
   return Array.isArray(data) ? data : (data.content ?? []);
 }
 

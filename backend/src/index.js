@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { applyRules, computeDeadline } from './rules.js';
 import { generateTask } from './llm.js';
-import { createTask, getProjects, getColumnsForProject, getUsers } from './yougile.js';
+import { createTask, getProjects, getBoardsForProject, getColumnsForBoard, getUsers } from './yougile.js';
 
 const app = express();
 app.use(cors());
@@ -70,10 +70,21 @@ app.get('/api/projects', async (_req, res) => {
   }
 });
 
-// GET /api/columns/:projectId
-app.get('/api/columns/:projectId', async (req, res) => {
+// GET /api/boards/:projectId
+app.get('/api/boards/:projectId', async (req, res) => {
   try {
-    const result = await getColumnsForProject(req.params.projectId);
+    const result = await getBoardsForProject(req.params.projectId);
+    res.json(result);
+  } catch (err) {
+    console.error('Boards error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/columns/:boardId
+app.get('/api/columns/:boardId', async (req, res) => {
+  try {
+    const result = await getColumnsForBoard(req.params.boardId);
     res.json(result);
   } catch (err) {
     console.error('Columns error:', err);

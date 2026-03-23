@@ -24,9 +24,15 @@ export interface YouGileProject {
   title: string;
 }
 
+export interface YouGileBoard {
+  id: string;
+  title: string;
+}
+
 export interface YouGileColumn {
   id: string;
-  name: string;
+  title: string;
+  name?: string;
 }
 
 export interface YouGileUser {

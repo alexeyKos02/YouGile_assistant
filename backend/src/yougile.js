@@ -17,36 +17,27 @@ async function request(method, path, body = null) {
   return res.json();
 }
 
-export async function getColumns() {
-  // Returns boards (sprints) for a project
-  const projectId = process.env.YOUGILE_PROJECT_ID;
-  if (!projectId) throw new Error('YOUGILE_PROJECT_ID not set');
-  return request('GET', `/projects/${projectId}/sprints`);
+export async function getProjects() {
+  return request('GET', '/projects');
 }
 
-export async function getColumnsForProject(projectId) {
+export async function getBoardsForProject(projectId) {
   if (!projectId) throw new Error('projectId is required');
-  return request('GET', `/columns?projectId=${projectId}`);
+  return request('GET', `/boards?projectId=${projectId}`);
+}
+
+export async function getColumnsForBoard(boardId) {
+  if (!boardId) throw new Error('boardId is required');
+  return request('GET', `/columns?boardId=${boardId}`);
 }
 
 export async function getUsers() {
-  // Users are embedded in project data, extract from all projects
-  const data = await request('GET', '/projects');
-  const projects = data.content ?? [];
-  const usersMap = {};
-  for (const project of projects) {
-    if (project.users) {
-      for (const [id] of Object.entries(project.users)) {
-        usersMap[id] = { id, name: id };
-      }
-    }
-  }
-  return { content: Object.values(usersMap) };
+  return request('GET', '/users');
 }
 
 export async function createTask({ title, description, checklist, priority, deadline, columnId, assigneeId }) {
   const columnIdToUse = columnId ?? process.env.YOUGILE_COLUMN_ID;
-  if (!columnIdToUse) throw new Error('YOUGILE_COLUMN_ID not set and not provided');
+  if (!columnIdToUse) throw new Error('columnId is required');
 
   const body = {
     title,
@@ -73,8 +64,4 @@ function buildDescription(description, checklist) {
     .join('\n');
 
   return `${description}\n\n**Чек-лист:**\n${checklistMarkdown}`;
-}
-
-export async function getProjects() {
-  return request('GET', '/projects');
 }

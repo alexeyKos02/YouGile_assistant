@@ -48,16 +48,30 @@
             </select>
           </div>
 
+          <!-- Board -->
+          <div class="settings-field">
+            <label class="field-label">Доска</label>
+            <select
+              class="select-input"
+              v-model="selectedBoardId"
+              @change="onBoardChange"
+              :disabled="!selectedProjectId || loadingBoards"
+            >
+              <option value="">{{ loadingBoards ? 'Загрузка...' : '— выберите доску —' }}</option>
+              <option v-for="b in boards" :key="b.id" :value="b.id">{{ b.title }}</option>
+            </select>
+          </div>
+
           <!-- Column -->
           <div class="settings-field">
             <label class="field-label">Колонка</label>
             <select
               class="select-input"
               v-model="selectedColumnId"
-              :disabled="!selectedProjectId || loadingColumns"
+              :disabled="!selectedBoardId || loadingColumns"
             >
               <option value="">{{ loadingColumns ? 'Загрузка...' : '— выберите колонку —' }}</option>
-              <option v-for="c in columns" :key="c.id" :value="c.id">{{ c.name }}</option>
+              <option v-for="c in columns" :key="c.id" :value="c.id">{{ c.title ?? c.name }}</option>
             </select>
           </div>
 
@@ -174,8 +188,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import type { GeneratedTask, YouGileProject, YouGileColumn, YouGileUser } from './types';
-import { generateTask, createTask, getProjects, getColumns, getUsers } from './api';
+import type { GeneratedTask, YouGileProject, YouGileBoard, YouGileColumn, YouGileUser } from './types';
+import { generateTask, createTask, getProjects, getBoards, getColumns, getUsers } from './api';
 
 const inputText = ref('');
 const task = ref<GeneratedTask | null>(null);
@@ -187,12 +201,15 @@ const createSuccess = ref('');
 
 // YouGile selectors
 const projects = ref<YouGileProject[]>([]);
+const boards = ref<YouGileBoard[]>([]);
 const columns = ref<YouGileColumn[]>([]);
 const users = ref<YouGileUser[]>([]);
 const selectedProjectId = ref('');
+const selectedBoardId = ref('');
 const selectedColumnId = ref('');
 const selectedAssigneeId = ref('');
 const loadingProjects = ref(false);
+const loadingBoards = ref(false);
 const loadingColumns = ref(false);
 const loadingUsers = ref(false);
 const settingsError = ref('');
@@ -225,15 +242,32 @@ async function loadUsers() {
 }
 
 async function onProjectChange() {
+  selectedBoardId.value = '';
   selectedColumnId.value = '';
+  boards.value = [];
   columns.value = [];
   if (!selectedProjectId.value) return;
 
+  loadingBoards.value = true;
+  try {
+    boards.value = await getBoards(selectedProjectId.value);
+  } catch (e) {
+    settingsError.value = 'Не удалось загрузить доски проекта.';
+  } finally {
+    loadingBoards.value = false;
+  }
+}
+
+async function onBoardChange() {
+  selectedColumnId.value = '';
+  columns.value = [];
+  if (!selectedBoardId.value) return;
+
   loadingColumns.value = true;
   try {
-    columns.value = await getColumns(selectedProjectId.value);
+    columns.value = await getColumns(selectedBoardId.value);
   } catch (e) {
-    settingsError.value = 'Не удалось загрузить колонки проекта.';
+    settingsError.value = 'Не удалось загрузить колонки доски.';
   } finally {
     loadingColumns.value = false;
   }
