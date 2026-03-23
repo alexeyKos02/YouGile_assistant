@@ -36,7 +36,7 @@ export async function generateTask(rawText, hints) {
 `.trim();
 
   const response = await client.chat.completions.create({
-    model: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
+    model: process.env.OPENAI_MODEL ?? 'gpt-5',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
