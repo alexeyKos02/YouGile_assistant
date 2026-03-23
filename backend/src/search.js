@@ -170,7 +170,7 @@ export async function searchTasks(query, tasks, totalTasksInProject = 0, model =
       { role: 'system', content: SEARCH_PROMPT },
       { role: 'user', content: userMessage },
     ],
-    max_completion_tokens: isReasoningModel ? 25000 : 8000,
+    max_completion_tokens: isReasoningModel ? 50000 : 8000,
     ...(isReasoningModel ? { reasoning_effort: 'medium' } : { temperature: 0.15 }),
     response_format: isReasoningModel
       ? {
