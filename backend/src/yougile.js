@@ -50,7 +50,7 @@ export async function createTask({ title, description, checklist, priority, dead
   }
 
   if (assigneeId) {
-    body.assigned = { [assigneeId]: true };
+    body.assigned = [assigneeId];
   }
 
   return request('POST', '/tasks', body);
