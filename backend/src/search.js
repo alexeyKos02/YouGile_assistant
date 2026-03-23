@@ -168,7 +168,7 @@ export async function searchTasks(query, tasks, totalTasksInProject = 0) {
       { role: 'user', content: userMessage },
     ],
     temperature: 0.15,
-    max_tokens: 8000,
+    max_completion_tokens: 8000,
     response_format: { type: 'json_object' },
   });
 

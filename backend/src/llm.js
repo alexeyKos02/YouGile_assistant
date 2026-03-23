@@ -42,7 +42,7 @@ export async function generateTask(rawText, hints) {
       { role: 'user', content: userPrompt },
     ],
     temperature: 0.4,
-    max_tokens: 800,
+    max_completion_tokens: 800,
     response_format: { type: 'json_object' },
   });
 
