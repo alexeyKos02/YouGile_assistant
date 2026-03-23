@@ -132,7 +132,7 @@
             <div v-if="task.checklist?.length" class="field">
               <label class="field-label">Чек-лист</label>
               <ul class="checklist">
-                <li v-for="(item, i) in task.checklist" :key="i" class="checklist-item">
+                <li v-for="(_item, i) in task.checklist" :key="i" class="checklist-item">
                   <span class="check-box">☐</span>
                   <input
                     class="checklist-input"
