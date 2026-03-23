@@ -2,81 +2,187 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const SEARCH_PROMPT = `Ты — опытный тимлид, который делает детальный разбор задач для руководителя.
+// ─── Pass 1: select relevant task IDs from titles only ───────────────────────
 
-ТВОЯ ЗАДАЧА: проанализировать ВСЕ переданные задачи, не пропустить ни одной, связать их между собой и дать полную картину.
+const SELECT_PROMPT = `Ты — фильтр задач. По запросу пользователя выбери ID наиболее релевантных задач.
+Включай задачи, прямо или косвенно связанные с запросом по теме, системе, функциональности.
+Выбирай максимум 15 задач. Отвечай ТОЛЬКО валидным JSON: {"ids": ["id1","id2",...]}`;
 
-═══ ПРАВИЛА АНАЛИЗА ═══
+export async function selectRelevantIds(query, allTasks, model) {
+  const selectedModel = model ?? process.env.OPENAI_MODEL ?? 'gpt-4o';
+  const isReasoningModel = /^(o\d|gpt-5)/.test(selectedModel);
 
-1. ПОЛНОТА — каждая задача должна попасть в groups.tasks. Не объединяй несколько задач в одну запись.
+  // Compact: one line per task
+  const list = allTasks
+    .map(t => `${t.id} | ${t.title} | ${t.columnTitle ?? '?'} | ${t.completed ? '✓' : '○'}`)
+    .join('\n');
 
-2. ФАКТЫ + АНАЛИЗ:
-   - Сначала конкретные факты из данных (названия систем, пункты чеклиста, содержание чата)
-   - Затем аналитический вывод: что это значит для проекта, есть ли риск, что может застопориться
+  const response = await client.chat.completions.create({
+    model: selectedModel,
+    messages: [
+      { role: 'system', content: SELECT_PROMPT },
+      { role: 'user', content: `ЗАПРОС: "${query}"\n\nЗАДАЧИ:\n${list}` },
+    ],
+    max_completion_tokens: isReasoningModel ? 5000 : 500,
+    ...(isReasoningModel ? { reasoning_effort: 'low' } : { temperature: 0 }),
+    response_format: isReasoningModel
+      ? {
+          type: 'json_schema',
+          json_schema: {
+            name: 'ids',
+            strict: true,
+            schema: {
+              type: 'object',
+              properties: { ids: { type: 'array', items: { type: 'string' } } },
+              required: ['ids'],
+              additionalProperties: false,
+            },
+          },
+        }
+      : { type: 'json_object' },
+  });
 
-3. ЧАТ — это ключевой источник контекста:
-   - Что обсуждали в чате? Какие решения приняли?
-   - Есть ли упоминания проблем, блокеров, ожиданий?
-   - Цитируй ключевые фразы из чата если они важны
-   - Если чат пустой — скажи об этом
+  const parsed = JSON.parse(response.choices[0].message.content);
+  return parsed.ids ?? [];
+}
 
-4. СВЯЗИ МЕЖДУ ЗАДАЧАМИ:
-   - Если несколько задач явно связаны — объясни как именно
-   - Используй поле crossLinks и parentTask/siblings для поиска связей
-   - В summary обязательно опиши как задачи влияют друг на друга
+// ─── Pass 2: deep analysis of enriched tasks ─────────────────────────────────
 
-5. КОНКРЕТИКА — запрещены фразы:
-   - "ведётся работа", "необходимо выполнить", "направлена на", "в рамках"
-   - Вместо этого: называй конкретные системы, сервисы, действия из данных
+const ANALYZE_PROMPT = `Ты — опытный тимлид, который делает детальный разбор задач для руководителя.
 
-6. ЕСЛИ ДАННЫХ МАЛО:
-   - Описание пустое — скажи "описание не заполнено" и проанализируй по названию
-   - Чат пустой — скажи "обсуждений нет"
-   - Не придумывай детали
-
-7. СТАТУС:
-   - completed=true → "Завершена"
-   - columnTitle содержит "done/готов/завершён" → "Завершена"
-   - columnTitle содержит "работ/процесс/progress/wip/делаем" → "В работе"
-   - иначе → "В очереди"
-
-8. HEALTH:
-   - "good" — большинство задач завершено или активно движется
-   - "warning" — есть задержки, незакрытые зависимости, задачи без прогресса
-   - "critical" — явные блокеры, работа стоит, нарушены дедлайны
-
-═══ ФОРМАТ ОТВЕТА ═══
+ПРАВИЛА:
+1. Каждая задача должна попасть в groups.tasks — не пропускай ни одну.
+2. Факты из данных + аналитический вывод (риски, зависимости, что может застопориться).
+3. Чат — ключевой источник: что обсуждали, решения, блокеры. Цитируй важные фразы.
+4. Связи: parentTask/siblings/crossLinks — опиши как задачи влияют друг на друга.
+5. Запрещены: "ведётся работа", "необходимо выполнить", "в рамках". Называй конкретные системы.
+6. Статус: completed=true или колонка done/готов → "Завершена"; работ/process/wip → "В работе"; иначе → "В очереди".
+7. Health: good — движется; warning — задержки/зависимости; critical — блокеры/дедлайны нарушены.
 
 Отвечай ТОЛЬКО валидным JSON:
 {
-  "summary": "Полная аналитическая картина: перечисли ВСЕ найденные задачи по группам, опиши их состояние и связи. Что сделано, что в работе, что стоит. Какие риски видны из чатов и прогресса. Вывод: как в целом идут дела. 8-10 конкретных предложений.",
+  "summary": "8-10 конкретных предложений: все задачи, их состояние, связи, риски, вывод.",
   "overallHealth": "good | warning | critical",
   "groups": [
     {
-      "title": "Название направления (группируй по смыслу)",
-      "groupSummary": "Общий прогресс по группе: сколько задач завершено, что в работе, ключевые выводы из чатов этих задач. 3-4 предложения.",
+      "title": "Название направления",
+      "groupSummary": "3-4 предложения: прогресс группы, ключевые выводы из чатов.",
       "tasks": [
         {
-          "id": "uuid задачи",
-          "title": "заголовок задачи",
-          "brief": "Что конкретно нужно сделать — пересказ описания с реальными названиями систем/сервисов. Аналитика: почему это важно. Если описание пустое — так и скажи. 3-4 предложения.",
-          "currentState": "ФАКТЫ: статус колонки, что выполнено в чеклисте/подзадачах (по именам), ключевые обсуждения из чата. АНАЛИЗ: что это говорит о состоянии задачи — движется, застряла, завершена? Упомяни конкретные реплики из чата если есть важные. 5-7 предложений.",
-          "status": "Завершена / В работе / В очереди",
-          "progressDetail": "Точный прогресс: '[✓] название_подзадачи1, [ ] название_подзадачи2' или 'Чеклист \"X\": [✓] пункт1, [✓] пункт2, [ ] пункт3' или 'Нет подзадач и чеклиста'",
-          "chatSummary": "Краткое содержание чата: о чём говорили, какие решения приняли, есть ли проблемы упомянутые в переписке. Или 'Чат пустой — обсуждений нет'",
-          "dependencies": "Связи с другими задачами: родительская задача, братские подзадачи, перекрёстные связи по теме. Аналитика: как эти связи влияют на работу. Или null.",
-          "nextSteps": "Конкретные следующие шаги из невыполненных пунктов + аналитика приоритетности. Null если завершена.",
-          "related": "Список подзадач: '[✓] название1, [ ] название2'. Null если нет."
+          "id": "uuid",
+          "title": "заголовок",
+          "brief": "Что нужно сделать, почему важно. 3-4 предложения.",
+          "currentState": "Факты: статус, чеклист, чат. Анализ: движется/застряла. 5-7 предложений.",
+          "status": "Завершена | В работе | В очереди",
+          "progressDetail": "[✓] пункт1, [ ] пункт2 или 'Нет подзадач и чеклиста'",
+          "chatSummary": "О чём говорили, решения, проблемы. Или 'Чат пустой'.",
+          "dependencies": "Связи с другими задачами и их влияние. Или null.",
+          "nextSteps": "Конкретные следующие шаги. Null если завершена.",
+          "related": "Список подзадач. Null если нет."
         }
       ]
     }
   ],
-  "totalFound": число,
-  "insufficientData": true если у большинства задач нет описаний чеклистов и чата, иначе false
+  "totalFound": 0,
+  "insufficientData": false
 }`;
 
-export async function searchTasks(query, tasks, totalTasksInProject = 0, model = null) {
-  if (!tasks || tasks.length === 0) {
+function serializeTask(t) {
+  const checklistText = (t.checklists ?? []).map(cl => {
+    const done  = cl.items?.filter(i => i.isCompleted).length ?? 0;
+    const total = cl.items?.length ?? 0;
+    const items = (cl.items ?? [])
+      .map(i => `  ${i.isCompleted ? '[✓]' : '[ ]'} ${i.title.slice(0, 80)}`)
+      .join('\n');
+    return `Чеклист "${cl.title}" ${done}/${total}:\n${items}`;
+  }).join('\n') || 'нет';
+
+  const subtaskText = (t.subtaskDetails ?? []).map(s => {
+    const cl = (s.checklists ?? []).map(c => `${c.done}/${c.total}`).join(', ');
+    return `${s.completed ? '[✓]' : '[ ]'} ${s.title}${cl ? ` (${cl})` : ''}`;
+  }).join('\n') || 'нет';
+
+  const chatText = (t.chatMessages ?? []).length > 0
+    ? (t.chatMessages ?? []).slice(0, 8).map(m => `> ${m.text.slice(0, 120)}`).join('\n')
+    : '(пустой)';
+
+  const crossText = (t.crossLinks ?? []).slice(0, 8)
+    .map(c => `• ${c.title} [${c.columnTitle ?? '?'}] ${c.completed ? '✓' : '○'}`)
+    .join('\n') || null;
+
+  const deadline = t.deadline?.deadline
+    ? new Date(t.deadline.deadline).toLocaleDateString('ru-RU')
+    : 'нет';
+
+  return [
+    `=== ${t.title}`,
+    `ID:${t.id} | Колонка:${t.columnTitle ?? '?'} | ${t.completed ? 'ЗАВЕРШЕНА' : 'НЕ ЗАВЕРШЕНА'} | Дедлайн:${deadline}`,
+    `ОПИСАНИЕ: ${t.description ? t.description.slice(0, 400) : '(нет)'}`,
+    `ЧЕКЛИСТЫ:\n${checklistText}`,
+    `ПОДЗАДАЧИ:\n${subtaskText}`,
+    `ЧАТ:\n${chatText}`,
+    t.parentTask ? `РОДИТЕЛЬ: ${t.parentTask.title} (${t.parentTask.completed ? '✓' : 'в работе'})` : null,
+    (t.siblings ?? []).length ? `БРАТСКИЕ: ${t.siblings.map(s => `${s.completed ? '[✓]' : '[ ]'} ${s.title}`).join(', ')}` : null,
+    crossText ? `СВЯЗИ:\n${crossText}` : null,
+  ].filter(Boolean).join('\n');
+}
+
+function buildResponseFormat(isReasoningModel) {
+  if (!isReasoningModel) return { type: 'json_object' };
+  return {
+    type: 'json_schema',
+    json_schema: {
+      name: 'search_result',
+      strict: false,
+      schema: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string' },
+          overallHealth: { type: 'string' },
+          groups: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                groupSummary: { type: 'string' },
+                tasks: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      title: { type: 'string' },
+                      brief: { type: 'string' },
+                      currentState: { type: 'string' },
+                      status: { type: 'string' },
+                      progressDetail: { type: 'string' },
+                      chatSummary: { type: ['string', 'null'] },
+                      dependencies: { type: ['string', 'null'] },
+                      nextSteps: { type: ['string', 'null'] },
+                      related: { type: ['string', 'null'] },
+                    },
+                    required: ['id', 'title', 'brief', 'currentState', 'status', 'progressDetail', 'chatSummary', 'dependencies', 'nextSteps', 'related'],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ['title', 'groupSummary', 'tasks'],
+              additionalProperties: false,
+            },
+          },
+          totalFound: { type: 'number' },
+          insufficientData: { type: 'boolean' },
+        },
+        required: ['summary', 'overallHealth', 'groups', 'totalFound', 'insufficientData'],
+        additionalProperties: false,
+      },
+    },
+  };
+}
+
+export async function analyzeTasks(query, enrichedTasks, totalTasksInProject = 0, model = null) {
+  if (!enrichedTasks || enrichedTasks.length === 0) {
     return {
       summary: `По запросу "${query}" задачи не найдены. Попробуйте другой запрос.`,
       overallHealth: 'warning',
@@ -86,124 +192,28 @@ export async function searchTasks(query, tasks, totalTasksInProject = 0, model =
     };
   }
 
-  const tasksText = tasks.map(t => {
-    // Checklists — cap items at 15, title at 60 chars
-    const checklistText = (t.checklists ?? []).map(cl => {
-      const done  = cl.items?.filter(i => i.isCompleted).length ?? 0;
-      const total = cl.items?.length ?? 0;
-      const items = (cl.items ?? [])
-        .slice(0, 15)
-        .map(i => `  ${i.isCompleted ? '[✓]' : '[ ]'} ${i.title.slice(0, 60)}`)
-        .join('\n');
-      return `Чеклист "${cl.title}" ${done}/${total}:\n${items}`;
-    }).join('\n') || 'нет чеклистов';
+  const selectedModel = model ?? process.env.OPENAI_MODEL ?? 'gpt-4o';
+  const isReasoningModel = /^(o\d|gpt-5)/.test(selectedModel);
 
-    // Subtasks — no description, just title+status
-    const subtaskText = (t.subtaskDetails ?? []).map(s => {
-      const clParts = (s.checklists ?? []).map(cl => `${cl.done}/${cl.total}`).join(', ');
-      return `${s.completed ? '[✓]' : '[ ]'} ${s.title}${clParts ? ` (${clParts})` : ''}`;
-    }).join('\n') || 'нет подзадач';
-
-    // Chat — max 5 messages, 80 chars each
-    const chatText = (t.chatMessages ?? []).length > 0
-      ? (t.chatMessages ?? [])
-          .slice(0, 5)
-          .map(m => `> ${m.text.slice(0, 80)}`)
-          .join('\n')
-      : '(чат пустой)';
-
-    // Cross-links — max 5
-    const crossText = (t.crossLinks ?? []).length > 0
-      ? (t.crossLinks ?? []).slice(0, 5).map(c => `• ${c.title} [${c.columnTitle ?? '?'}] ${c.completed ? '✓' : '○'}`).join('\n')
-      : null;
-
-    const deadlineStr = t.deadline?.deadline
-      ? new Date(t.deadline.deadline).toLocaleDateString('ru-RU')
-      : 'нет';
-
-    return [
-      `--- ЗАДАЧА: ${t.title}`,
-      `ID:${t.id} | Колонка:${t.columnTitle ?? '?'} | ${t.completed ? 'ЗАВЕРШЕНА' : 'НЕ ЗАВЕРШЕНА'} | Дедлайн:${deadlineStr}`,
-      `ОПИСАНИЕ: ${t.description ? t.description.slice(0, 250) : '(нет)'}`,
-      `ЧЕКЛИСТЫ: ${checklistText}`,
-      `ПОДЗАДАЧИ: ${subtaskText}`,
-      `ЧАТ: ${chatText}`,
-      t.parentTask ? `РОДИТЕЛЬ: ${t.parentTask.title} (${t.parentTask.completed ? '✓' : 'в работе'})` : null,
-      crossText ? `СВЯЗИ: ${crossText}` : null,
-    ].filter(v => v !== null).join('\n');
-  }).join('\n\n');
+  const tasksText = enrichedTasks.map(serializeTask).join('\n\n');
 
   const userMessage = [
     `ЗАПРОС: "${query}"`,
-    `Всего задач в проекте: ${totalTasksInProject} | Найдено релевантных: ${tasks.length}`,
-    `ВАЖНО: проанализируй ВСЕ ${tasks.length} задач, не пропускай ни одну.`,
+    `Всего задач в проекте: ${totalTasksInProject} | Отобрано для анализа: ${enrichedTasks.length}`,
+    `Проанализируй ВСЕ ${enrichedTasks.length} задач ниже.`,
     ``,
     tasksText,
   ].join('\n');
 
-  const selectedModel = model ?? process.env.OPENAI_MODEL ?? 'gpt-4o';
-  const isReasoningModel = /^(o\d|gpt-5)/.test(selectedModel);
-
   const response = await client.chat.completions.create({
     model: selectedModel,
     messages: [
-      { role: 'system', content: SEARCH_PROMPT },
+      { role: 'system', content: ANALYZE_PROMPT },
       { role: 'user', content: userMessage },
     ],
     max_completion_tokens: isReasoningModel ? 50000 : 8000,
     ...(isReasoningModel ? { reasoning_effort: 'medium' } : { temperature: 0.15 }),
-    response_format: isReasoningModel
-      ? {
-          type: 'json_schema',
-          json_schema: {
-            name: 'search_result',
-            strict: false,
-            schema: {
-              type: 'object',
-              properties: {
-                summary: { type: 'string' },
-                overallHealth: { type: 'string' },
-                groups: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      title: { type: 'string' },
-                      groupSummary: { type: 'string' },
-                      tasks: {
-                        type: 'array',
-                        items: {
-                          type: 'object',
-                          properties: {
-                            id: { type: 'string' },
-                            title: { type: 'string' },
-                            brief: { type: 'string' },
-                            currentState: { type: 'string' },
-                            status: { type: 'string' },
-                            progressDetail: { type: 'string' },
-                            chatSummary: { type: ['string', 'null'] },
-                            dependencies: { type: ['string', 'null'] },
-                            nextSteps: { type: ['string', 'null'] },
-                            related: { type: ['string', 'null'] },
-                          },
-                          required: ['id', 'title', 'brief', 'currentState', 'status', 'progressDetail', 'chatSummary', 'dependencies', 'nextSteps', 'related'],
-                          additionalProperties: false,
-                        },
-                      },
-                    },
-                    required: ['title', 'groupSummary', 'tasks'],
-                    additionalProperties: false,
-                  },
-                },
-                totalFound: { type: 'number' },
-                insufficientData: { type: 'boolean' },
-              },
-              required: ['summary', 'overallHealth', 'groups', 'totalFound', 'insufficientData'],
-              additionalProperties: false,
-            },
-          },
-        }
-      : { type: 'json_object' },
+    response_format: buildResponseFormat(isReasoningModel),
   });
 
   return JSON.parse(response.choices[0].message.content);

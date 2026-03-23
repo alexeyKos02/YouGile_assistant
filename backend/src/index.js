@@ -4,7 +4,7 @@ import cors from 'cors';
 import { applyRules, computeDeadline } from './rules.js';
 import { generateTask } from './llm.js';
 import { createTask, getProjects, getBoardsForProject, getColumnsForBoard, getUsers, getStringStickers, getAllTasks, getSubtaskDetails, getTaskMessages } from './yougile.js';
-import { searchTasks } from './search.js';
+import { selectRelevantIds, analyzeTasks } from './search.js';
 
 const app = express();
 app.use(cors());
@@ -116,93 +116,54 @@ app.get('/api/users', async (_req, res) => {
 });
 
 // POST /api/search
-// Body: { query, projectId? }
+// Body: { query, model? }
 app.post('/api/search', async (req, res) => {
   const { query, model } = req.body;
   if (!query?.trim()) return res.status(400).json({ error: 'query is required' });
 
   try {
-    // 1. Fetch ALL tasks to build full context + dependency graph
-    const allTasks = await getAllTasks();
+    const selectedModel = model ?? process.env.OPENAI_MODEL ?? 'gpt-4o';
 
-    // 2. Build lookup map id → task
+    // 1. Fetch ALL tasks (thin — no chat/subtask details yet)
+    const allTasks = await getAllTasks();
     const taskMap = Object.fromEntries(allTasks.map(t => [t.id, t]));
 
-    // 3. Score ALL tasks by relevance
-    const q = query.trim().toLowerCase();
-    const words = q.split(/\s+/).filter(Boolean);
+    // 2. Pass 1: LLM picks relevant IDs from all titles (~4k tokens)
+    const relevantIds = await selectRelevantIds(query.trim(), allTasks, selectedModel);
+    const candidates = relevantIds.length > 0
+      ? allTasks.filter(t => relevantIds.includes(t.id))
+      : allTasks.slice(0, 12); // fallback if LLM returned nothing
 
-    const scored = allTasks.map(t => {
-      let score = 0;
-      const title = (t.title ?? '').toLowerCase();
-      const desc  = (t.description ?? '').toLowerCase();
+    console.log(`[search] query="${query}" total=${allTasks.length} selected=${candidates.length}`);
 
-      if (title.includes(q)) score += 30;
-      words.forEach(w => {
-        if (title.includes(w)) score += 8;
-        if (desc.includes(w))  score += 3;
-      });
-      return { ...t, _score: score };
-    }).filter(t => t._score > 0).sort((a, b) => b._score - a._score);
+    // 3. Enrich only the selected tasks (fetch chat + subtasks)
+    const enriched = await Promise.all(candidates.map(async t => {
+      const [subtaskDetails, chatMessages] = await Promise.all([
+        getSubtaskDetails(t.subtasks ?? []),
+        getTaskMessages(t.id),
+      ]);
+      const parentTask = allTasks.find(p => Array.isArray(p.subtasks) && p.subtasks.includes(t.id));
+      const siblings = parentTask
+        ? (parentTask.subtasks ?? [])
+            .filter(sid => sid !== t.id)
+            .map(sid => taskMap[sid]).filter(Boolean)
+            .map(s => ({ title: s.title, completed: s.completed }))
+        : [];
+      const crossLinks = candidates
+        .filter(other => other.id !== t.id)
+        .map(other => ({ title: other.title, completed: other.completed, columnTitle: other.columnTitle }));
+      return {
+        id: t.id, title: t.title, description: t.description,
+        columnTitle: t.columnTitle, completed: t.completed,
+        deadline: t.deadline, checklists: t.checklists,
+        subtaskDetails, chatMessages,
+        parentTask: parentTask ? { id: parentTask.id, title: parentTask.title, completed: parentTask.completed } : null,
+        siblings, crossLinks,
+      };
+    }));
 
-    // 4. Enrich top 12 relevant tasks
-    const enriched = await Promise.all(
-      scored.slice(0, 12).map(async t => {
-        const subtaskDetails = await getSubtaskDetails(t.subtasks ?? []);
-
-        // Chat messages for this task
-        const chatMessages = await getTaskMessages(t.id);
-
-        // Parent task
-        const parentTask = allTasks.find(p =>
-          Array.isArray(p.subtasks) && p.subtasks.includes(t.id)
-        );
-
-        // Sibling tasks (other subtasks under same parent)
-        const siblings = parentTask
-          ? (parentTask.subtasks ?? [])
-              .filter(sid => sid !== t.id)
-              .map(sid => taskMap[sid])
-              .filter(Boolean)
-              .map(s => ({ title: s.title, completed: s.completed }))
-          : [];
-
-        // Find other tasks in scored list that share words in title (cross-links)
-        const crossLinks = scored
-          .filter(other => other.id !== t.id)
-          .filter(other => {
-            const otherTitle = (other.title ?? '').toLowerCase();
-            return words.some(w => otherTitle.includes(w));
-          })
-          .map(other => ({ title: other.title, completed: other.completed, columnTitle: other.columnTitle }));
-
-        return {
-          id: t.id,
-          title: t.title,
-          description: t.description,
-          columnTitle: t.columnTitle,
-          completed: t.completed,
-          deadline: t.deadline,
-          checklists: t.checklists,
-          subtaskDetails,
-          chatMessages,
-          parentTask: parentTask
-            ? { id: parentTask.id, title: parentTask.title, completed: parentTask.completed }
-            : null,
-          siblings,
-          crossLinks,
-        };
-      })
-    );
-
-    // DEBUG
-    console.log(`[search] query="${query}" total=${allTasks.length} relevant=${enriched.length}`);
-    enriched.forEach(t => {
-      console.log(`  TASK: "${t.title}" | col="${t.columnTitle}" | done=${t.completed} | desc=${t.description?.length ?? 0}ch | sub=${t.subtaskDetails?.length ?? 0} | chat=${t.chatMessages?.length ?? 0}`);
-    });
-
-    // 5. LLM summarize with full context
-    const result = await searchTasks(query.trim(), enriched, allTasks.length, model ?? null);
+    // 4. Pass 2: deep LLM analysis of enriched tasks
+    const result = await analyzeTasks(query.trim(), enriched, allTasks.length, selectedModel);
     res.json(result);
   } catch (err) {
     console.error('Search error:', err);
